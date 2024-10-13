@@ -1,2 +1,2 @@
 # blockchain-and-security-in-rust
-Building blockchains and security tutorials in Rust
+Understanding blockchains and security concepts and implementations in Rust
