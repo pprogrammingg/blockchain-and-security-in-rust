@@ -47,7 +47,6 @@ mod tests {
 
         // assert
         assert_eq!(system.block_number, 0);
-
     }
 
     #[test]

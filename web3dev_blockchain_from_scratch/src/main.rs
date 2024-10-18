@@ -1,9 +1,23 @@
 use web3dev_blockchain_from_scratch::balances::Pallet;
+use web3dev_blockchain_from_scratch::{balances, system};
+
+pub struct RunTime {
+    balances: balances::Pallet,
+    system: system::Pallet,
+}
+
+impl RunTime {
+    pub fn new() -> Self {
+        Self {
+            balances: balances::Pallet::new(),
+            system: system::Pallet::new()
+        }
+    }
+}
 
 fn main() {
+    let run_time = RunTime::new();
     println!("Hello, world!");
-
-    let mut pallet = Pallet::new();
 }
 
 
@@ -11,7 +25,6 @@ fn main() {
 fn init_balance() {
     // arrange
     let mut balances = Pallet::new();
-    let mut system = Pallet::new();
 
     // assert
     assert_eq!(balances.balance("bob"), 0);
