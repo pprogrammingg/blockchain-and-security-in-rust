@@ -2,10 +2,15 @@ use std::collections::BTreeMap;
 
 /// Keep track of blockchain state
 
+type AccountId = String;
+type BlockNumer = u64;
+type Nonce = u64;
+
+#[derive(Debug)]
 pub struct Pallet {
-    block_number: u32,
+    block_number: BlockNumer,
     // keep track of user vs number of tx
-    nonce: BTreeMap<String, u32>
+    nonce: BTreeMap<AccountId, Nonce>
 }
 
 impl Pallet {
@@ -16,7 +21,7 @@ impl Pallet {
         }
     }
 
-    pub fn block_number(&self) -> u32 {
+    pub fn block_number(&self) -> BlockNumer {
         self.block_number
     }
 
@@ -25,14 +30,14 @@ impl Pallet {
         self.block_number = self.block_number.checked_add(1).unwrap();
     }
 
-    pub fn get_nonce(&self, who: &str) -> u32 {
-        *self.nonce.get(&who.to_string()).unwrap_or(&0)
+    pub fn get_nonce(&self, who: AccountId) -> Nonce {
+        *self.nonce.get(&who).unwrap_or(&0)
     }
-    pub fn inc_nonce(&mut self, who: &str) {
-        let nonce = self.get_nonce(who);
+    pub fn inc_nonce(&mut self, who: AccountId) {
+        let nonce = self.get_nonce(who.clone());
 
         // crash on purpose if nonce value overflows
-        self.nonce.insert(who.into(), nonce.checked_add(1).unwrap());
+        self.nonce.insert(who, nonce.checked_add(1).unwrap());
     }
 }
 
@@ -67,10 +72,10 @@ mod tests {
         let mut system = Pallet::new();
 
         // act
-        system.inc_nonce("alice");
-        system.inc_nonce("alice");
+        system.inc_nonce("alice".to_string());
+        system.inc_nonce("alice".to_string());
 
         // assert
-        assert_eq!(system.get_nonce("alice"), 2);
+        assert_eq!(system.get_nonce("alice".to_string()), 2);
     }
 }
