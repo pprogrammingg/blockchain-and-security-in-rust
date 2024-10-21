@@ -1,43 +1,46 @@
 use std::collections::BTreeMap;
+use std::ops::AddAssign;
+use num::{CheckedAdd, CheckedSub, One, Zero};
 
 /// Keep track of blockchain state
 
-type AccountId = String;
-type BlockNumer = u64;
-type Nonce = u64;
-
 #[derive(Debug)]
-pub struct Pallet {
-    block_number: BlockNumer,
+pub struct Pallet<A, B, N> {
+    block_number: B,
     // keep track of user vs number of tx
-    nonce: BTreeMap<AccountId, Nonce>
+    nonce: BTreeMap<A, N>
 }
 
-impl Pallet {
-    pub fn new() -> Pallet {
+impl<A, B, N> Pallet<A, B, N>
+where
+    A: Ord + Clone,
+    B: Zero + One + CheckedAdd + CheckedSub + Copy + AddAssign,
+    N: Zero + One + CheckedAdd + CheckedSub + Copy + AddAssign,
+{
+    pub fn new() -> Self {
         Pallet {
-            block_number: 0,
+            block_number: B::zero(),
             nonce: BTreeMap::new(),
         }
     }
 
-    pub fn block_number(&self) -> BlockNumer {
+    pub fn block_number(&self) -> B {
         self.block_number
     }
 
     pub fn inc_block_number(&mut self) {
         // On purpose crash if overflows
-        self.block_number = self.block_number.checked_add(1).unwrap();
+        self.block_number = self.block_number.checked_add(&B::one()).unwrap();
     }
 
-    pub fn get_nonce(&self, who: AccountId) -> Nonce {
-        *self.nonce.get(&who).unwrap_or(&0)
+    pub fn get_nonce(&self, who: A) -> N {
+        *self.nonce.get(&who).unwrap_or(&N::zero())
     }
-    pub fn inc_nonce(&mut self, who: AccountId) {
+    pub fn inc_nonce(&mut self, who: A) {
         let nonce = self.get_nonce(who.clone());
 
         // crash on purpose if nonce value overflows
-        self.nonce.insert(who, nonce.checked_add(1).unwrap());
+        self.nonce.insert(who, nonce.checked_add(&N::one()).unwrap());
     }
 }
 
