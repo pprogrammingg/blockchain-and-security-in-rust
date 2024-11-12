@@ -9,6 +9,7 @@ mod types {
 
     pub type Nonce = u64;
 }
+
 #[derive(Debug)]
 pub struct RunTime {
     balances: balances::Pallet<types::AccountId, types::Balance>,
@@ -24,11 +25,22 @@ impl RunTime {
     }
 }
 
+fn bob() -> String {
+    "bob".to_string()
+}
+
+fn alice() -> String {
+    "alice".to_string()
+}
+
+fn charlie() -> String {
+    "charlie".to_string()
+}
 fn main() {
     let mut run_time = RunTime::new();
-    let alice = "alice".to_string();
-    let bob = "bob".to_string();
-    let charlie = "charlie".to_string();
+    let alice = alice();
+    let bob = bob();
+    let charlie = charlie();
 
     run_time.balances.set_balance(alice.clone(), 100);
 
@@ -46,83 +58,81 @@ fn main() {
         .map_err(|e| println!("Error: {:?}", e));
 
     println!("{:?}", run_time);
-
-
-
-
-
-
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn init_balance() {
-    // arrange
-    let mut balances = Pallet::new();
+    #[test]
+    fn init_balance() {
+        // arrange
+        let mut balances: Pallet<String, u32> = Pallet::new();
 
-    // assert
-    assert_eq!(balances.balance("bob"), 0);
+        // assert
+        assert_eq!(balances.balance(bob()), 0);
 
-    // act
-    balances.set_balance("bob", 100);
+        // act
+        balances.set_balance(bob(), 100);
 
-    // assert
-    assert_eq!(balances.balance("bob"), 100);
-    assert_eq!(balances.balance("alice"), 0);
-}
+        // assert
+        assert_eq!(balances.balance(bob()), 100);
+        assert_eq!(balances.balance(alice()), 0);
+    }
 
-#[test]
-fn transfer_balance() {
-    // arrange
-    let mut balances = Pallet::new();
-    assert_eq!(balances.balance("bob"), 0);
+    #[test]
+    fn transfer_balance() {
+        // arrange
+        let mut balances: Pallet<String, u128> = Pallet::new();
+        assert_eq!(balances.balance(bob()), 0);
 
-    // act
-    balances.set_balance("bob", 100);
-    balances.set_balance("alice", 50);
+        // act
+        balances.set_balance(bob(), 100);
+        balances.set_balance(alice(), 50);
 
-    // Bob transfers 50 to Alice
-    balances.transfer("bob", "alice", 50).unwrap();
+        // Bob transfers 50 to Alice
+        balances.transfer(bob(), alice(), 50).unwrap();
 
-    // assert
-    assert_eq!(balances.balance("bob"), 50);
-    assert_eq!(balances.balance("alice"), 100);
-}
+        // assert
+        assert_eq!(balances.balance(bob()), 50);
+        assert_eq!(balances.balance(alice()), 100);
+    }
 
-#[test]
-fn transfer_balance_insufficient() {
-    // arrange
-    let mut balances = Pallet::new();
-    assert_eq!(balances.balance("bob"), 0);
+    #[test]
+    fn transfer_balance_insufficient() {
+        // arrange
+        let mut balances: Pallet<String, u128>  = Pallet::new();
+        assert_eq!(balances.balance(bob()), 0);
 
-    // act
-    balances.set_balance("bob", 100);
-    balances.set_balance("alice", 50);
+        // act
+        balances.set_balance(bob(), 100);
+        balances.set_balance(alice(), 50);
 
-    // Bob transfers 50 to Alice
-    let transfer_result = balances.transfer("bob", "alice", 110);
+        // Bob transfers 50 to Alice
+        let transfer_result = balances.transfer(bob(), alice(), 110);
 
-    // assert
-    assert_eq!(transfer_result, Err("Insufficient balance"));
-    assert_eq!(balances.balance("bob"), 100);
-    assert_eq!(balances.balance("alice"), 50);
-}
+        // assert
+        assert_eq!(transfer_result, Err("Insufficient balance"));
+        assert_eq!(balances.balance(bob()), 100);
+        assert_eq!(balances.balance(alice()), 50);
+    }
 
-#[test]
-fn transfer_balance_overflow() {
-    // arrange
-    let mut balances = Pallet::new();
-    assert_eq!(balances.balance("bob"), 0);
+    #[test]
+    fn transfer_balance_overflow() {
+        // arrange
+        let mut balances: Pallet<String, u128>  = Pallet::new();
+        assert_eq!(balances.balance(bob()), 0);
 
-    // act
-    balances.set_balance("bob", 100);
-    balances.set_balance("alice", u128::MAX);
+        // act
+        balances.set_balance(bob(), 100);
+        balances.set_balance(alice(), u128::MAX);
 
-    // Bob transfers 50 to Alice
-    let transfer_result = balances.transfer("bob", "alice", 50);
+        // Bob transfers 50 to Alice
+        let transfer_result = balances.transfer(bob(), alice(), 50);
 
-    // assert
-    assert_eq!(transfer_result, Err("Overflow when adding balance"));
-    assert_eq!(balances.balance("bob"), 100);
-    assert_eq!(balances.balance("alice"), u128::MAX);
+        // assert
+        assert_eq!(transfer_result, Err("Overflow when adding balance"));
+        assert_eq!(balances.balance(bob()), 100);
+        assert_eq!(balances.balance(alice()), u128::MAX);
+    }
 }

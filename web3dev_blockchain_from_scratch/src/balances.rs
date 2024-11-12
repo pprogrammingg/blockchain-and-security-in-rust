@@ -3,7 +3,6 @@ use num::{CheckedAdd, CheckedSub, Zero};
 
 #[derive(Debug)]
 pub struct Pallet<A,B> {
-    // key/value structure, key is
     balances: BTreeMap<A, B>,
 }
 

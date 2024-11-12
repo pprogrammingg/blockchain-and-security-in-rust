@@ -2,56 +2,67 @@ use std::collections::BTreeMap;
 use std::ops::AddAssign;
 use num::{CheckedAdd, CheckedSub, One, Zero};
 
-/// Keep track of blockchain state
-
-#[derive(Debug)]
-pub struct Pallet<A, B, N> {
-    block_number: B,
-    // keep track of user vs number of tx
-    nonce: BTreeMap<A, N>
+pub trait Config {
+    type AccountId: Ord + Clone;
+    type BlockNumber:  Zero + One + AddAssign + Copy;
+    type Nonce: Zero + One + Copy;
 }
 
-impl<A, B, N> Pallet<A, B, N>
-where
-    A: Ord + Clone,
-    B: Zero + One + CheckedAdd + CheckedSub + Copy + AddAssign,
-    N: Zero + One + CheckedAdd + CheckedSub + Copy + AddAssign,
+
+#[derive(Debug)]
+pub struct Pallet<T: Config> {
+    block_number: T::BlockNumber,
+    // keep track of user vs number of tx
+    nonce: BTreeMap<T::AccountId, T::Nonce>
+}
+
+impl<T: Config> Pallet<T>
 {
     pub fn new() -> Self {
         Pallet {
-            block_number: B::zero(),
+            block_number: T::BlockNumber::zero(),
             nonce: BTreeMap::new(),
         }
     }
 
-    pub fn block_number(&self) -> B {
+    pub fn block_number(&self) -> T::BlockNumber {
         self.block_number
     }
 
     pub fn inc_block_number(&mut self) {
         // On purpose crash if overflows
-        self.block_number = self.block_number.checked_add(&B::one()).unwrap();
+        self.block_number = self.block_number.checked_add(&T::BlockNumber::one()).unwrap();
     }
 
-    pub fn get_nonce(&self, who: A) -> N {
-        *self.nonce.get(&who).unwrap_or(&N::zero())
+    pub fn get_nonce(&self, who: T::AccountId) -> T::Nonce {
+        *self.nonce.get(&who).unwrap_or(&T::Nonce::zero())
     }
-    pub fn inc_nonce(&mut self, who: A) {
+    pub fn inc_nonce(&mut self, who: T::AccountId) {
         let nonce = self.get_nonce(who.clone());
 
         // crash on purpose if nonce value overflows
-        self.nonce.insert(who, nonce.checked_add(&N::one()).unwrap());
+        self.nonce.insert(who, nonce.checked_add(&T::Nonce::one()).unwrap());
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::system::Pallet;
+    use crate::system::{Config, Pallet};
+
+    struct TestConfig;
+
+    impl Config for TestConfig {
+        type AccountId = String;
+        type BlockNumber = u32;
+        type Nonce = u32;
+    }
+
+    type TestPallet = Pallet<TestConfig>;
 
     #[test]
     fn init_system() {
         // arrange
-        let system = Pallet::new();
+        let system : Pallet<TestPallet> = Pallet::new();
 
         // assert
         assert_eq!(system.block_number, 0);
@@ -60,7 +71,7 @@ mod tests {
     #[test]
     fn inc_block_number() {
         // arrange
-        let mut system = Pallet::new();
+        let mut system: Pallet<TestPallet> = Pallet::new();
 
         // act
         system.inc_block_number();
@@ -72,7 +83,7 @@ mod tests {
     #[test]
     fn inc_nonce() {
         // arrange
-        let mut system = Pallet::new();
+        let mut system: Pallet<TestPallet> = Pallet::new();
 
         // act
         system.inc_nonce("alice".to_string());
