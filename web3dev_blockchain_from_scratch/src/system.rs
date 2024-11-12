@@ -1,13 +1,12 @@
 use std::collections::BTreeMap;
 use std::ops::AddAssign;
-use num::{CheckedAdd, CheckedSub, One, Zero};
+use num::{CheckedAdd, One, Zero};
 
 pub trait Config {
     type AccountId: Ord + Clone;
-    type BlockNumber:  Zero + One + AddAssign + Copy;
-    type Nonce: Zero + One + Copy;
+    type BlockNumber:  Zero + One + CheckedAdd + AddAssign + Copy;
+    type Nonce: Zero + One + CheckedAdd + Copy;
 }
-
 
 #[derive(Debug)]
 pub struct Pallet<T: Config> {
@@ -62,7 +61,7 @@ mod tests {
     #[test]
     fn init_system() {
         // arrange
-        let system : Pallet<TestPallet> = Pallet::new();
+        let system : TestPallet = Pallet::new();
 
         // assert
         assert_eq!(system.block_number, 0);
@@ -71,7 +70,7 @@ mod tests {
     #[test]
     fn inc_block_number() {
         // arrange
-        let mut system: Pallet<TestPallet> = Pallet::new();
+        let mut system: TestPallet = Pallet::new();
 
         // act
         system.inc_block_number();
@@ -83,7 +82,7 @@ mod tests {
     #[test]
     fn inc_nonce() {
         // arrange
-        let mut system: Pallet<TestPallet> = Pallet::new();
+        let mut system: TestPallet = Pallet::new();
 
         // act
         system.inc_nonce("alice".to_string());

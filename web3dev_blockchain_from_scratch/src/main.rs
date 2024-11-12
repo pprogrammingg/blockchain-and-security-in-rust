@@ -1,4 +1,4 @@
-use web3dev_blockchain_from_scratch::balances::Pallet;
+
 use web3dev_blockchain_from_scratch::{balances, system};
 
 mod types {
@@ -10,13 +10,26 @@ mod types {
     pub type Nonce = u64;
 }
 
-#[derive(Debug)]
-pub struct RunTime {
-    balances: balances::Pallet<types::AccountId, types::Balance>,
-    system: system::Pallet<types::AccountId, types::BlockNumber, types::Nonce>,
+
+impl system::Config for Runtime {
+    type AccountId = types::AccountId;
+    type BlockNumber = types::BlockNumber;
+    type Nonce = types::Nonce;
+
 }
 
-impl RunTime {
+impl balances::Config for Runtime {
+    type AccountId = types::AccountId;
+    type Balance = types::Balance;
+}
+
+#[derive(Debug)]
+pub struct Runtime {
+    balances: balances::Pallet<Runtime>,
+    system: system::Pallet<Runtime>,
+}
+
+impl Runtime {
     pub fn new() -> Self {
         Self {
             balances: balances::Pallet::new(),
@@ -37,7 +50,7 @@ fn charlie() -> String {
     "charlie".to_string()
 }
 fn main() {
-    let mut run_time = RunTime::new();
+    let mut run_time = Runtime::new();
     let alice = alice();
     let bob = bob();
     let charlie = charlie();
@@ -62,12 +75,14 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use web3dev_blockchain_from_scratch::balances::Pallet;
     use super::*;
+
 
     #[test]
     fn init_balance() {
         // arrange
-        let mut balances: Pallet<String, u32> = Pallet::new();
+        let mut balances: Pallet<Runtime> = Pallet::new();
 
         // assert
         assert_eq!(balances.balance(bob()), 0);
@@ -83,7 +98,7 @@ mod tests {
     #[test]
     fn transfer_balance() {
         // arrange
-        let mut balances: Pallet<String, u128> = Pallet::new();
+        let mut balances: Pallet<Runtime> = Pallet::new();
         assert_eq!(balances.balance(bob()), 0);
 
         // act
@@ -101,7 +116,7 @@ mod tests {
     #[test]
     fn transfer_balance_insufficient() {
         // arrange
-        let mut balances: Pallet<String, u128>  = Pallet::new();
+        let mut balances: Pallet<Runtime>  = Pallet::new();
         assert_eq!(balances.balance(bob()), 0);
 
         // act
@@ -120,7 +135,7 @@ mod tests {
     #[test]
     fn transfer_balance_overflow() {
         // arrange
-        let mut balances: Pallet<String, u128>  = Pallet::new();
+        let mut balances: Pallet<Runtime>  = Pallet::new();
         assert_eq!(balances.balance(bob()), 0);
 
         // act
