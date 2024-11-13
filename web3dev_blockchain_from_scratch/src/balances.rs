@@ -2,8 +2,7 @@ use std::collections::BTreeMap;
 use std::ops::AddAssign;
 use num::{CheckedAdd, CheckedSub, One, Zero};
 
-pub trait Config {
-    type AccountId: Ord + Clone;
+pub trait Config : crate::system::Config{
     type Balance: Zero + One + CheckedAdd + CheckedSub + AddAssign + Copy;
 }
 
@@ -50,5 +49,50 @@ impl<T: Config> Pallet<T>
         self.set_balance(to, new_to_balance);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    struct TestConfig;
+
+    impl crate::system::Config for TestConfig {
+        type AccountId = String;
+        type BlockNumber = u32;
+        type Nonce = u32;
+    }
+
+    impl super::Config for TestConfig {
+        type Balance = u128;
+    }
+
+    #[test]
+    fn init_balances() {
+        let mut balances = super::Pallet::<TestConfig>::new();
+
+        assert_eq!(balances.balance("alice".to_string()), 0);
+        balances.set_balance("alice".to_string(), 100);
+        assert_eq!(balances.balance("alice".to_string()), 100);
+        assert_eq!(balances.balance("bob".to_string()), 0);
+    }
+
+    #[test]
+    fn transfer_balance() {
+        let mut balances = super::Pallet::<TestConfig>::new();
+
+        assert_eq!(
+            balances.transfer("alice".to_string(), "bob".to_string(), 51),
+            Err("Insufficient balance")
+        );
+
+        balances.set_balance("alice".to_string(), 100);
+        assert_eq!(balances.transfer("alice".to_string(), "bob".to_string(), 51), Ok(()));
+        assert_eq!(balances.balance("alice".to_string()), 49);
+        assert_eq!(balances.balance("bob".to_string()), 51);
+
+        assert_eq!(
+            balances.transfer("alice".to_string(), "bob".to_string(), 51),
+            Err("Insufficient balance")
+        );
     }
 }
