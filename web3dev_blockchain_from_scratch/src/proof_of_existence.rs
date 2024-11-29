@@ -16,6 +16,23 @@ pub struct Pallet<T: Config> {
     claims: BTreeMap<T::Content, T::AccountId>,
 }
 
+pub enum Call<T: Config> {
+    CreateClaim { claim: T::Content },
+    RevokeClaim { claim: T::Content },
+}
+
+impl<T: Config> crate::support::Dispatch for Pallet<T> {
+    type Caller = T::AccountId;
+    type Call = Call<T>;
+
+    fn dispatch(&mut self, caller: Self::Caller, call: Self::Call) -> DispatchResult {
+        match call {
+            Call::CreateClaim { claim } => self.create_claim(caller, claim),
+            Call::RevokeClaim { claim } => self.revoke_claim(caller, claim),
+        }
+    }
+}
+
 impl<T: Config> Pallet<T> {
     /// Create a new instance of the Proof of Existence Module.
     pub fn new() -> Self {

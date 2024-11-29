@@ -1,5 +1,8 @@
+use std::fmt::Debug;
+
 use web3dev_blockchain_from_scratch::{
     balances,
+    proof_of_existence,
     support,
     support::Dispatch,
     system,
@@ -20,10 +23,13 @@ mod types {
     pub type Header = support::Header<BlockNumber>;
 
     pub type Block = support::Block<Header, Extrinsic>;
+
+    pub type Content = &'static str;
 }
 
 pub enum RuntimeCall {
     Balances(balances::Call<Runtime>),
+    ProofOfExistence(proof_of_existence::Call<Runtime>),
 }
 impl system::Config for Runtime {
     type AccountId = types::AccountId;
@@ -35,10 +41,15 @@ impl balances::Config for Runtime {
     type Balance = types::Balance;
 }
 
+impl proof_of_existence::Config for Runtime {
+    type Content = types::Content;
+}
+
 #[derive(Debug)]
 pub struct Runtime {
     balances: balances::Pallet<Runtime>,
     system: system::Pallet<Runtime>,
+    proof_of_existence: proof_of_existence::Pallet<Runtime>,
 }
 
 impl Runtime {
@@ -46,6 +57,7 @@ impl Runtime {
         Self {
             balances: balances::Pallet::new(),
             system: system::Pallet::new(),
+            proof_of_existence: proof_of_existence::Pallet::new(),
         }
     }
 
@@ -106,6 +118,10 @@ impl crate::support::Dispatch for Runtime {
                 self.balances
                     .dispatch(caller, call)?;
             }
+            RuntimeCall::ProofOfExistence(call) => {
+                self.proof_of_existence
+                    .dispatch(caller, call)?;
+            }
         }
         Ok(())
     }
@@ -138,12 +154,12 @@ fn main() {
             support::Extrinsic {
                 caller: alice.clone(),
                 call: RuntimeCall::Balances(balances::Call::Transfer {
-                    to: bob,
+                    to: bob.clone(),
                     amount: 30,
                 }),
             },
             support::Extrinsic {
-                caller: alice,
+                caller: alice.clone(),
                 call: RuntimeCall::Balances(balances::Call::Transfer {
                     to: charlie,
                     amount: 20,
@@ -156,6 +172,27 @@ fn main() {
         .execute_block(block_1)
         .expect("wrong block execution!");
 
+    let block_2 = types::Block {
+        header: support::Header { block_number: 2 },
+        extrinsics: vec![
+            support::Extrinsic {
+                caller: alice.clone(),
+                call: RuntimeCall::ProofOfExistence(proof_of_existence::Call::CreateClaim {
+                    claim: "my_document",
+                }),
+            },
+            support::Extrinsic {
+                caller: bob.clone(),
+                call: RuntimeCall::ProofOfExistence(proof_of_existence::Call::CreateClaim {
+                    claim: "bob's doc",
+                }),
+            },
+        ],
+    };
+
+    run_time
+        .execute_block(block_2)
+        .expect("wrong block execution!");
     println!("{:?}", run_time);
 }
 
