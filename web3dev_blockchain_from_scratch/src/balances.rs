@@ -19,27 +19,8 @@ pub struct Pallet<T: Config> {
     balances: BTreeMap<T::AccountId, T::Balance>,
 }
 
+#[macros::call]
 impl<T: Config> Pallet<T> {
-    pub fn new() -> Self {
-        Self {
-            balances: BTreeMap::new(),
-        }
-    }
-
-    /// set the balance of who
-    pub fn set_balance(&mut self, who: T::AccountId, amount: T::Balance) {
-        self.balances
-            .insert(who, amount);
-    }
-
-    /// get the balance of who
-    pub fn balance(&self, who: T::AccountId) -> T::Balance {
-        *self
-            .balances
-            .get(&who)
-            .unwrap_or(&T::Balance::zero())
-    }
-
     pub fn transfer(
         &mut self,
         caller: T::AccountId,
@@ -64,29 +45,25 @@ impl<T: Config> Pallet<T> {
     }
 }
 
-pub enum Call<T: Config> {
-    Transfer {
-        to: T::AccountId,
-        amount: T::Balance,
-    },
-}
-
-/// Implementation of the dispatch logic, mapping from `BalancesCall` to the appropriate underlying
-/// function we want to execute.
-impl<T: Config> crate::support::Dispatch for Pallet<T> {
-    type Caller = T::AccountId;
-    type Call = Call<T>;
-
-    fn dispatch(
-        &mut self,
-        caller: Self::Caller,
-        call: Self::Call,
-    ) -> crate::support::DispatchResult {
-        match call {
-            Call::Transfer { to, amount } => self.transfer(caller, to, amount)?,
+impl<T: Config> Pallet<T> {
+    pub fn new() -> Self {
+        Self {
+            balances: BTreeMap::new(),
         }
+    }
 
-        Ok(())
+    /// set the balance of who
+    pub fn set_balance(&mut self, who: T::AccountId, amount: T::Balance) {
+        self.balances
+            .insert(who, amount);
+    }
+
+    /// get the balance of who
+    pub fn balance(&self, who: T::AccountId) -> T::Balance {
+        *self
+            .balances
+            .get(&who)
+            .unwrap_or(&T::Balance::zero())
     }
 }
 
