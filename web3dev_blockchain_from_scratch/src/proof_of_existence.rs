@@ -16,20 +16,34 @@ pub struct Pallet<T: Config> {
     claims: BTreeMap<T::Content, T::AccountId>,
 }
 
-pub enum Call<T: Config> {
-    CreateClaim { claim: T::Content },
-    RevokeClaim { claim: T::Content },
-}
-
-impl<T: Config> crate::support::Dispatch for Pallet<T> {
-    type Caller = T::AccountId;
-    type Call = Call<T>;
-
-    fn dispatch(&mut self, caller: Self::Caller, call: Self::Call) -> DispatchResult {
-        match call {
-            Call::CreateClaim { claim } => self.create_claim(caller, claim),
-            Call::RevokeClaim { claim } => self.revoke_claim(caller, claim),
+#[macros::call]
+impl<T: Config> Pallet<T> {
+    /// Create a new claim on behalf of the `caller`.
+    /// This function will return an error if someone already has claimed that content.
+    pub fn create_claim(&mut self, caller: T::AccountId, claim: T::Content) -> DispatchResult {
+        if self
+            .claims
+            .contains_key(&claim)
+        {
+            return Err(&"this content is already claimed");
         }
+        self.claims
+            .insert(claim, caller);
+        Ok(())
+    }
+
+    /// Revoke an existing claim on some content.
+    /// This function should only succeed if the caller is the owner of an existing claim.
+    /// It will return an error if the claim does not exist, or if the caller is not the owner.
+    pub fn revoke_claim(&mut self, caller: T::AccountId, claim: T::Content) -> DispatchResult {
+        let owner = self
+            .get_claim(&claim)
+            .ok_or("claim does not exist")?;
+        if caller != *owner {
+            return Err(&"this content is owned by someone else");
+        }
+        self.claims.remove(&claim);
+        Ok(())
     }
 }
 
@@ -43,33 +57,6 @@ impl<T: Config> Pallet<T> {
 
     pub fn get_claim(&self, claim: &T::Content) -> Option<&T::AccountId> {
         self.claims.get(claim)
-    }
-
-    // add claim
-    pub fn create_claim(&mut self, caller: T::AccountId, claim: T::Content) -> DispatchResult {
-        match self.get_claim(&claim) {
-            Some(_) => Err("Claim already exists"),
-            None => {
-                self.claims
-                    .insert(claim, caller);
-                Ok(())
-            }
-        }
-    }
-
-    // revoke claim
-    pub fn revoke_claim(&mut self, caller: T::AccountId, claim: T::Content) -> DispatchResult {
-        let claim_owner = self
-            .get_claim(&claim)
-            .ok_or("Claim does not exist")?;
-
-        if claim_owner != &caller {
-            return Err("Caller is not the owner of the claim");
-        }
-
-        self.claims.remove(&claim);
-
-        Ok(())
     }
 }
 
@@ -96,13 +83,13 @@ mod test {
         assert_eq!(poe.get_claim(&"my_document"), Some(&"alice"));
 
         let res = poe.revoke_claim(&"bob", "my_document");
-        assert_eq!(res, Err("Caller is not the owner of the claim"));
+        assert_eq!(res, Err("this content is owned by someone else"));
 
         let res = poe.create_claim("bob", "my_document");
-        assert_eq!(res, Err("Claim already exists"));
+        assert_eq!(res, Err("this content is already claimed"));
 
         let res = poe.revoke_claim("alice", "non existent");
-        assert_eq!(res, Err("Claim does not exist"));
+        assert_eq!(res, Err("claim does not exist"));
 
         let _ = poe.revoke_claim("alice", "my_document");
         assert_eq!(poe.get_claim(&"my_document"), None);
