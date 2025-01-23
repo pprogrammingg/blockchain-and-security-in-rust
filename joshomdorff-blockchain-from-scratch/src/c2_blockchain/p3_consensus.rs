@@ -1,6 +1,7 @@
 //! We now have a hash-linked header chain that accepts simple extrinsics and tracks simple state.
 //! Now we will explore consensus. We are not looking at finality or fork choice here. Rather,
-//! we are adding validity rules. There are two common types of validity rules and we will explore both.
+//! we are adding validity rules. There are two common types of validity rules and we will explore
+//! both.
 //! 1. Rules to throttle authoring. In this case we will use a simple PoW.
 //! 2. Arbitrary / Political rules. Here we will implement two alternate validity rules
 
@@ -13,7 +14,7 @@ type Hash = u64;
 /// In this lesson we are introducing proof of work onto our blocks. We need a hash threshold.
 /// You may change this as you see fit, and I encourage you to experiment. Probably best to start
 /// high so we aren't wasting time mining. I'll start with 1 in 100 blocks being valid.
-pub const THRESHOLD: u64 = u64::max_value() / 100;
+pub const THRESHOLD: u64 = u64::MAX / 100;
 
 /// In this lesson we introduce the concept of a contentious hard fork. The fork will happen at
 /// this block height.

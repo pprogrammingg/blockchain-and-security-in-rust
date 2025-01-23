@@ -7,6 +7,8 @@
 //! In the coming parts of this tutorial, we will expand this to be more real-world like and
 //! use some real batching.
 
+use std::thread::current;
+
 use crate::hash;
 
 // We will use Rust's built-in hashing where the output type is u64. I'll make an alias
@@ -16,7 +18,8 @@ type Hash = u64;
 /// The header is now expanded to contain an extrinsic and a state. Note that we are not
 /// using roots yet, but rather directly embedding some minimal extrinsic and state info
 /// into the header.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct Header {
     parent: Hash,
     height: u64,
@@ -31,12 +34,19 @@ pub struct Header {
 impl Header {
     /// Returns a new valid genesis header.
     fn genesis() -> Self {
-        todo!("Exercise 1")
+        Header::default()
     }
 
     /// Create and return a valid child header.
+    /// Parent.State + extrinsic = Child.state
     fn child(&self, extrinsic: u64) -> Self {
-        todo!("Exercise 2")
+        Header {
+            parent: hash(self),
+            height: self.height + 1,
+            extrinsic,
+            state: self.state + extrinsic,
+            consensus_digest: (),
+        }
     }
 
     /// Verify that all the given headers form a valid chain from this header to the tip.
@@ -48,7 +58,19 @@ impl Header {
     /// So in order for a block to verify, we must have that relationship between the extrinsic,
     /// the previous state, and the current state.
     fn verify_sub_chain(&self, chain: &[Header]) -> bool {
-        todo!("Exercise 3")
+        let mut parent_header = self;
+        for header in chain {
+            let parent_hash_correct = header.parent == hash(parent_header);
+            let child_height_correct = parent_header.height == header.height - 1;
+            let child_extrinsic_correct = header.state == header.extrinsic + parent_header.state;
+            if parent_hash_correct && child_height_correct && child_extrinsic_correct {
+                parent_header = header;
+            } else {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 
@@ -56,7 +78,21 @@ impl Header {
 
 /// Build and return a valid chain with the given number of blocks.
 fn build_valid_chain(n: u64) -> Vec<Header> {
-    todo!("Exercise 4")
+    let mut parent = Header::genesis();
+    let mut headers = vec![parent.clone()];
+
+    for i in 0..n {
+        let header = Header {
+            parent: hash(&parent),
+            height: parent.height + 1,
+            extrinsic: 0,
+            state: 0,
+            consensus_digest: (),
+        };
+        headers.push(header);
+    }
+
+    headers
 }
 
 /// Build and return a chain with at least three headers.
@@ -67,10 +103,14 @@ fn build_valid_chain(n: u64) -> Vec<Header> {
 /// However, from outside this crate, it is not so trivial. Our interface for creating
 /// new blocks, `genesis()` and `child()`, makes it impossible to create arbitrary blocks.
 ///
-/// For this function, ONLY USE the the `genesis()` and `child()` methods to create blocks.
+/// For this function, ONLY USE the `genesis()` and `child()` methods to create blocks.
 /// The exercise is still possible.
 fn build_an_invalid_chain() -> Vec<Header> {
-    todo!("Exercise 5")
+    let parent = Header::genesis();
+    let c1 = parent.child(0);
+    let c2 = parent.child(1);
+
+    vec![c1, c2, parent]
 }
 
 /// Build and return two header chains.
@@ -85,7 +125,18 @@ fn build_an_invalid_chain() -> Vec<Header> {
 ///
 /// Side question: What is the fewest number of headers you could create to achieve this goal.
 fn build_forked_chain() -> (Vec<Header>, Vec<Header>) {
-    todo!("Exercise 6")
+    let genesis = Header::genesis();
+
+    let shared_1 = genesis.child(1); // Block 1 (shared)
+    let shared_2 = shared_1.child(2); // Block 2 (shared)
+
+    let fork_1 = shared_2.child(3); // Block 3 on Chain 1
+    let fork_2 = shared_2.child(10); // Block 3' on Chain 2
+
+    let chain_1 = vec![genesis.clone(), shared_1.clone(), shared_2.clone(), fork_1];
+    let chain_2 = vec![genesis, shared_1, shared_2, fork_2];
+
+    (chain_1, chain_2)
 
     // Exercise 7: After you have completed this task, look at how its test is written below.
     // There is a critical thinking question for you there.
