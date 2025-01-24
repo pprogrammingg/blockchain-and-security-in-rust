@@ -5,6 +5,8 @@
 //! 1. Rules to throttle authoring. In this case we will use a simple PoW.
 //! 2. Arbitrary / Political rules. Here we will implement two alternate validity rules
 
+use std::os::macos::raw::stat;
+
 use crate::hash;
 
 // We will use Rust's built-in hashing where the output type is u64. I'll make an alias
@@ -24,7 +26,7 @@ const FORK_HEIGHT: u64 = 2;
 /// For Proof of Work, the consensus digest is basically just a nonce which gets the block
 /// hash below a certain threshold. Although we could call the field `nonce` we will leave
 /// the more general `digest` term. For PoA we would have a cryptographic signature in this field.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct Header {
     parent: Hash,
     height: u64,
@@ -33,17 +35,43 @@ pub struct Header {
     consensus_digest: u64,
 }
 
+pub enum PossibleStates {
+    EVEN,
+    ODD,
+    UNSPECIFIED,
+}
+
 // Here are the methods for creating new header and verifying headers.
 // It is your job to write them.
 impl Header {
     /// Returns a new valid genesis header.
     fn genesis() -> Self {
-        todo!("Exercise 1")
+        Header::default()
     }
 
     /// Create and return a valid child header.
     fn child(&self, extrinsic: u64) -> Self {
-        todo!("Exercise 2")
+        let parent_hash = hash(self);
+        let mut consensus_digest = 0;
+
+        // loop until a valid hash of header (< Threshold) is found
+        loop {
+            let possible_header = Header {
+                parent: parent_hash,
+                height: self.height + 1,
+                extrinsic,
+                state: self.state + extrinsic,
+                consensus_digest,
+            };
+
+            let candidate_hash = hash(&possible_header);
+
+            if candidate_hash < THRESHOLD {
+                return possible_header;
+            }
+
+            consensus_digest += 1;
+        }
     }
 
     /// Verify that all the given headers form a valid chain from this header to the tip.
@@ -51,7 +79,7 @@ impl Header {
     /// In addition to all the rules we had before, we now need to check that the block hash
     /// is below a specific threshold.
     fn verify_sub_chain(&self, chain: &[Header]) -> bool {
-        todo!("Exercise 3")
+        self.verify_sub_chain_based_on_state(chain, PossibleStates::UNSPECIFIED)
     }
 
     // After the blockchain ran for a while, a political rift formed in the community.
@@ -63,13 +91,51 @@ impl Header {
     /// verify that the given headers form a valid chain.
     /// In this case "valid" means that the STATE MUST BE EVEN.
     fn verify_sub_chain_even(&self, chain: &[Header]) -> bool {
-        todo!("Exercise 4")
+        self.verify_sub_chain_based_on_state(chain, PossibleStates::EVEN)
     }
 
     /// verify that the given headers form a valid chain.
     /// In this case "valid" means that the STATE MUST BE ODD.
     fn verify_sub_chain_odd(&self, chain: &[Header]) -> bool {
-        todo!("Exercise 5")
+        self.verify_sub_chain_based_on_state(chain, PossibleStates::ODD)
+    }
+
+    /// A general verify_sub_chain fn where we can specify type of state we want
+    ///  Stat
+    fn verify_sub_chain_based_on_state(
+        &self,
+        chain: &[Header],
+        correct_state_type: PossibleStates,
+    ) -> bool {
+        let mut parent_header = self;
+        for header in chain {
+            let parent_hash_correct = header.parent == hash(parent_header);
+            let header_height_correct = parent_header.height == header.height - 1;
+            let header_extrinsic_correct = header.state == header.extrinsic + parent_header.state;
+            let header_consensus_digest_correct = header.consensus_digest < THRESHOLD;
+            if parent_hash_correct
+                && header_height_correct
+                && header_extrinsic_correct
+                && header_consensus_digest_correct
+            {
+                if header.height > FORK_HEIGHT {
+                    let state_correct = match correct_state_type {
+                        PossibleStates::EVEN => header.state % 2 == 0,
+                        PossibleStates::ODD => header.state % 2 == 1,
+                        PossibleStates::UNSPECIFIED => true,
+                    };
+
+                    if !state_correct {
+                        return false;
+                    }
+                }
+                parent_header = header;
+            } else {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 
@@ -90,7 +156,22 @@ impl Header {
 /// G -- 1 -- 2
 ///            \-- 3'-- 4'
 fn build_contentious_forked_chain() -> (Vec<Header>, Vec<Header>, Vec<Header>) {
-    todo!("Exercise 6")
+    let genesis = Header::genesis();
+
+    let shared_1 = genesis.child(1); // Block 1 (shared)
+    let shared_2 = shared_1.child(2); // Block 2 (shared)
+
+    let even_1 = shared_2.child(3); // Block 1 on even_chain
+    let even_2 = even_1.child(2); // Block 2 on even_chain  state = 8
+
+    let odd_1 = shared_2.child(2); // Block 1 on odd_chain
+    let odd_2 = odd_1.child(2); // Block 2 on odd_chain
+
+    let shared = vec![genesis, shared_1, shared_2];
+    let even = vec![even_1, even_2];
+    let odd = vec![odd_1, odd_2];
+
+    (shared, even, odd)
 }
 
 // To run these tests: `cargo test bc_3`
@@ -228,7 +309,9 @@ fn bc_3_even_chain_valid() {
     let b3 = b2.child(1); // 4
     let b4 = b3.child(2); // 6
 
-    assert!(g.verify_sub_chain_even(&[b1, b2, b3, b4]));
+    let chain = &[b1, b2, b3, b4];
+    dbg!(chain);
+    assert!(g.verify_sub_chain_even(chain));
 }
 
 #[test]
