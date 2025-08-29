@@ -19,87 +19,114 @@ Interactive Proves
 Lecture 2 June 19, 2025
 Non-Interactive Proofs
 
-- SNARKs
+- SNARK: Succinct proof that certain statement is true. E.g. I know an m such that SHA256(m) = 0
+- ZK-SNARK: same as definition above but never reveal m
+- Companies:
+    - Building SNARK Software: StarkWare, Aztec, MatterLabs, Espresso Systems
+    - Using SNARK Software: RISC Zero, Scroll, Polygon, Aleo
+    - SNARK Accelerator: SUPRA National, IGONYAMA
+- A slow processor like L1 Blockchain can monitor herd of faster processors like GPU running unreliable SW (Babaei etal,
+    1991)
+
+    - do it in polylog time (very efficient)
+
+- Examples (important to note that proofs are short and succinct and non-interactive)
+    - Off-Chain computation
+    - Bridging from one chain to another
+    - Privacy Tx (Tornado Cash, ZKCash, Aleo, IronFish)
+        - Proof that private Tx is compliant by banking laws (Espresso)
+        - Proof that an exchange is solvent (Raposa)
+
+    - Non-Blockchain
+        - like fighting fake image in disinfo
+        -
+- Became possible because of polynomial/linear time proofs and algebra
+
+- NARKs are non-interactive argument, SNARKS is Succinct versijn
+- SNARKS formal def:
+    - Given triple (S, P, V)
+        - S gives Prover Params (PP) and Verifier Params (VP)
+        - P operates on (PP, X , W) called proof (PI) where X is statement to prove and W is witness. Where strongly
+          succinct
+          mean len(pi) = O(log|C|)
+        - V operates on (VP, X, PI) and needs to do so in O(log|C|)) where c is arithmetic circuit (gates as nodes and
+          edges as operations to represent polynomials). V has no time to read C fully. This is where S giving VP comes
+          in
+
+- ZK-SNARK: is zero knowledge SNARK where w is not known.
+
+- Circuits
+    - Operate over Finite fields elements are mapped to others
+    - Structured vs Non-Structured
+
+- S - Pre-processor step
+    - S(C;r) -> (PP, VP) , C = Circuit, r = random bits (r is kept hidden from prover otherwise prover can prove wrong
+      statements)
+    - often a trusted setup runs for the secret we want to generate proofs for and the machines that generated random
+      secret r will be destroyed (often complicated and we would like to avoid)
+    - another way is Universal (updatable) setup: secret r independet of C
+      S init (lambda; r) -> gp (one-time setup, global params), S index (gp, C) -> (pp, vp)
+    - Best: Transparent setup: S(C) does not use secret data (no trusted setup)
+
+- SNARK Systems (Partial)
+    - Groth'16 (trusted circuit), Plonk/Marlin (universal trusted setup)
+    - For both proofs are extremely space and time efficient
+    - Bulletproof: short proof, verification time bad, transparent system
+    - STARK: relatively ok succint and verifier time, transparent setup
+    - STARK is post-quantum
+    - for all proof time is linear in size of circuit |C|
+- Knowledge Soundness:
+    - Prover knows w, if w can be "extracted" from P (prover)
+
+- Build (ZK)SNARK
+    - Two generic steps:
+        - Functional Commitment - which is a cryptographic object whose security depends on certain assumptions
+            - commitment : 2 Algorithms, it is like a sealed envole which is hiding and binding
+                1. commit(m,r) -> com, where r is random bits
+                2. verify(m, com, r) -> accept or reject
+
+        - Functional Commitment types:
+            - polynomial( KZG used most , because of constant time prover and verification), multi-linear,
+              vector (e.g. Merkle), IPA (Inner Product Argument) -> important building blocks,
+              you can build one from another
+              -KZG10 a great impl example as its proof and verification is constant size independent of
+              of degree d
+            - Equality test protocol
+
+        - Interactive Oracle Proof (IOP) - is an information theoric object
+
+    - non-interactive
+        - Fiat-Shemir Transform converts any public-coin interactive protocol to non-interactive
+
+    - Combine with a layer of Interactive Oracle Polynomial
+        - Terminology is such that if we apply IOP, functions are replaced by oracles (practically commitments) of those
+          functions.
+        - Polynomial-IOP Example
+
+- The IOP Zoo - any of these combos gives SNARK
+    - poly-IOP + poly commitment
+    - multi-linear IOP + multi-linear commitment
+    - Vector IOP + Merkle
+
+
+- Coding SNARKs
+    - developing circuits for programmers is untenable
+    - Usually go from a DSL (like CAIRO, Zinc, Noir, Circom, etc.) to "SNARK friendly format" such as Circuit, R1CS,
+      EVM ByteCode, etc. then this is applied to "SNARK Backend Prover" (Heavy Computation - given witness X
+      produce Pi as proof)
+
+Lecture 3 Aug 13
+
+- Idea -> Highlevel Language -> Compiler/Library -> R1CS -> ZK Proof System
+- examle: ZCash
+  ZCash Circuit -> Bellman Lib -> R1CS -> Groth16
+
+- Polynomial representation of circuit using DAG for example
+- R1CS (Rank-1 Constraint Systems)   A x z (. -> element-wise multiplication) B x z = C x z, where x means inner product
 
 ## Terms
 
-# 📚 Foundational Terms in Zero-Knowledge Proofs (ZKP)
-
-*Inspired by Prof. Shafi Goldwasser’s early lectures*
-
----
-
 ## 🧠 Key Terms with Descriptions and Examples
 
-| **Term**                         | **Description**                                                                                                     | **Example**                                                                        |
-|----------------------------------|---------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
-| **Zero-Knowledge Proof (ZKP)**   | A method for one party (prover) to convince another (verifier) that a statement is true, **without revealing why**. | Prove a number is a quadratic residue mod N **without revealing its square root**. |
-| **Prover (P)**                   | The party who knows the **witness** and tries to convince the verifier.                                             | Alice knows square root of a mod N.                                                |
-| **Verifier (V)**                 | The party who checks the proof and is convinced that the statement is true.                                         | Bob wants to be sure a is a quadratic residue mod N.                               |
-| **Statement / Instance**         | The public problem input, denoted as `x`.                                                                           | “Is `a` a square mod `N`?” or “Are two graphs isomorphic?”                         |
-| **Witness**                      | The secret knowledge that shows the statement is true.                                                              | The square root `w` such that `w^2 ≡ a mod N`.                                     |
-| **Language (L)**                 | The set of true statements; often an **NP language**.                                                               | All `a ∈ ℤ_N^*` that are quadratic residues.                                       |
-| **NP**                           | Class of problems where verifying a proof takes polynomial time, but finding it may be hard.                        | Graph Isomorphism: easy to check if a mapping is valid.                            |
-| **CO-NP**                        | A decision problem is in co-NP if "no" instances can be verified in polynomial time given a witness.                |                                                                                    |
-| **Completeness**                 | If the statement is true, an honest prover **always** convinces the verifier.                                       | If Alice really knows the square root, Bob accepts.                                |
-| **Soundness**                    | A dishonest prover **can’t cheat** and convince the verifier of a false statement.                                  | Alice cannot convince Bob that a non-residue is a residue.                         |
-| **Zero-Knowledge**               | The verifier learns **nothing** except that the statement is true — not the witness.                                | Bob is convinced `a` is a residue, but learns no info about the root.              |
-| **Simulator**                    | A tool used in security proofs to show that whatever the verifier sees could be faked.                              | Can simulate proof without the square root.                                        |
-| **Extractor**                    | A theoretical algorithm that can extract the witness if the prover can cheat successfully.                          | If Alice can answer multiple challenges, we can recover the square root.           |
-| **Interactive Proof**            | A multi-round protocol between prover and verifier.                                                                 | Graph Isomorphism protocol has 3 rounds.                                           |
-| **Non-Interactive Proof**        | A proof that’s sent in one message, often using a hash-based challenge.                                             | zk-SNARKs use Fiat-Shamir to avoid interaction.                                    |
-| **Commitment Scheme**            | Like a locked box: commit to a value, then open it later.                                                           | Alice commits to a value `r`, then reveals it after Bob's challenge.               |
-| **Random Challenge**             | Chosen by verifier to prevent the prover from preparing ahead.                                                      | Bob sends a random bit in the graph isomorphism protocol.                          |
-| **Rewinding**                    | A technique used in analysis to reset a protocol to an earlier point with a different challenge.                    | Used by extractor to get two responses from same commitment.                       |
-| **Witness Indistinguishability** | Even if multiple witnesses exist, verifier can’t tell which one was used.                                           | If there are 2 square roots, verifier can't tell which one Alice used.             |
-
----
-
-## 🧪 Example Protocols
-
-### 1. Quadratic Residue (QR) Problem
-
-- **Goal**: Prove that `a ∈ ℤ_N^*` is a quadratic residue without revealing the square root.
-- **Protocol**:
-    1. Prover chooses random `r` and sends `t = r² mod N`.
-    2. Verifier sends a random bit `c ∈ {0,1}`.
-    3. Prover responds with:
-        - `s = r` if `c = 0`
-        - `s = r * w mod N` if `c = 1`, where `w` is the square root of `a`.
-    4. Verifier checks:
-        - `s² ≡ t` if `c = 0`
-        - `s² ≡ a·t` if `c = 1`
-
-### 2. Graph Isomorphism Protocol
-
-- **Goal**: Prover knows an isomorphism `π` between graphs `G₁` and `G₂` and wants to prove they are isomorphic without
-  revealing `π`.
-- **Protocol**:
-    1. Prover picks random permutation `ρ` and sends permuted graph `H = ρ(G₁)`.
-    2. Verifier sends a random challenge bit `c ∈ {1, 2}`.
-    3. Prover reveals:
-        - If `c = 1`: show `ρ`
-        - If `c = 2`: show `ρ ◦ π⁻¹` to map `G₂ → H`
-    4. Verifier checks that the mapping is a valid isomorphism to `H`.
-
----
-
-*These definitions and examples build the foundation for understanding more advanced zero-knowledge protocols like
-zk-SNARKs, zk-STARKs, and ZK rollups.*
-
-- 🔑 Key Differences: NP vs NP-Complete
-
-| Concept                  | NP                                     | NP-Complete                                    |
-|--------------------------|----------------------------------------|------------------------------------------------|
-| What is it?              | Problems with **verifiable** solutions | The **hardest** problems in NP                 |
-| Easy to solve?           | Maybe — depends on the problem         | Probably **not** (no one has found a fast way) |
-| Easy to check?           | ✅ Yes                                  | ✅ Yes                                          |
-| All of NP reduces to it? | ❌ Not necessarily                      | ✅ Yes                                          |
-
-- ZK and Blockchain
-  In theory: Prover and verifier exchange messages multiple times (interactive proofs).
-  In practice (blockchain): We use non-interactive ZK proofs — especially: zk-SNARKs, zk-STARKs
-  This is achieved using the Fiat-Shamir heuristic, which removes interaction by replacing verifier's randomness with a
-  cryptographic hash function.
-
-## Terms 
+- Quadratic Residue
+- bilinear pairing (used for proving)

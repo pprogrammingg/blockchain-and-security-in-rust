@@ -1,4 +1,4 @@
-# Key Management Re-Imagined from Frist Principles
+# Key Management Re-Imagined from First Principles
 
 - Every transaction in Web3 starts and ends with private keys. Typically hard to store and manage.
 

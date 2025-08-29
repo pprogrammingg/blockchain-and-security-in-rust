@@ -20,4 +20,4 @@
           New Hash Value) - hash of (old concatenated to new hash)
           so hashes are commulative chains, the type of operation is referred to as `extending` the hash and result is
           called `measurement`
-        - 
+      

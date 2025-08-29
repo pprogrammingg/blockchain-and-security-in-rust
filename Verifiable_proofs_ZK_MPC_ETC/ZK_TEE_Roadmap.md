@@ -1,41 +1,46 @@
-# 🧭 ZK + Rust Learning Roadmap (Functional Naming Edition)
+# 🧭 ZK + Rust Learning Roadmap
 
----
+1. ZK Math Foundations (~5-6 weeks)
+   Modular arithmetic, quadratic residues, elliptic curves.
 
-## 🟦 Phase 1: ZK Math & Foundational Rust (Weeks 1–4)
+Focus on the math relevant to zk circuits (modulo fields, groups).
 
-| Week   | What You'll Learn                       | Project                                | Output                                      |
-|--------|-----------------------------------------|----------------------------------------|---------------------------------------------|
-| **W1** | Proof Conversations (Prover ↔ Verifier) | Interactive proof with secrets in Rust | Blog: “Proving Knowledge Without Revealing” |
-| **W2** | Building Constraint Systems by Hand     | Encode algebra as constraints (R1CS)   | Blog: “Making a Circuit Speak Algebra”      |
-| **W3** | Hiding & Binding Commitments            | Secret commit & reveal demo            | Code + write-up                             |
-| **W4** | Designing Computations into Circuits    | Arithmetic circuit + witness generator | Blog: “How Circuits Simulate Code”          |
+2. Core ZK Protocols (~6-8 weeks)
+   Interactive proofs, Fiat-Shamir heuristic, ZK-SNARKs, ZK-STARKs.
 
-Readings:
+Understand the proving-verifying mindset.
 
-- Berkerly BootCamp
--
+3. Rust Crypto Libraries (~8-10 weeks)
+   Study libraries:
+   arkworks, bellman, halo2, risc0, zkp.
 
----
+Build toy circuits (simple range proofs, set membership).
 
-## 🟨 Phase 2: Real ZK Libraries + Rust Power (Weeks 5–8)
+4. Proof Systems & Rust Integration (~10-12 weeks)
+   Work with Circom + Rust bindings or fully Rust-native circuits.
 
-| Week   | What You'll Learn                     | Project                                | Output                                   |
-|--------|---------------------------------------|----------------------------------------|------------------------------------------|
-| **W5** | Plug & Play Proof Systems             | Use Groth16 prover/verifier APIs       | Blog: “Plugging Rust into Proofs”        |
-| **W6** | Running Programs with ZK Transparency | Split zkVM: write → run → prove        | Blog: “Making Programs Prove Themselves” |
-| **W7** | Proving Correct Input/Output          | Full proof pipeline for data integrity | CLI + blog                               |
-| **W8** | Bridging Visual Circuits to Rust Code | Verify Circom circuit from Rust        | Repo + walkthrough                       |
+Write code to generate proofs and verify them in Rust.
 
----
+Handle serialization, proof aggregation, efficient circuits.
 
-## 🟥 Phase 3: Advanced Rust, TEE, and Web3 Integration (Weeks 9–12)
+5. Build Projects (~10-12 weeks)
+   Build a small dApp or backend API using zk proofs.
 
-| Week    | What You'll Learn                         | Project                              | Output                             |
-|---------|-------------------------------------------|--------------------------------------|------------------------------------|
-| **W9**  | Enforcing Code Trust with Hardware        | TEE-based randomness + proof         | Blog: “Hardware Enclaves for ZK”   |
-| **W10** | Going Low-Level with Memory & Concurrency | Async-safe ZK service (Arc/Mutex)    | Repo + blog                        |
-| **W11** | Automating Code Patterns with Macros      | `zk_prove!` procedural macro         | Blog: “Macros to Teach ZK in Rust” |
-| **W12** | Making Proofs Usable in Web3              | Badge dApp that verifies user proofs | Capstone: blog + screencast        |
+Example: zk-login, anonymous voting, zk asset transfer.
 
----
+🔧 Factors that Affect Timeline:
+If you can increase weekly hours to ~10 hrs/week → 4-6 months.
+
+Prior cryptography background → faster math ramp-up.
+
+Mentorship or structured cohort → faster progression.
+
+🚀 Fast-Track Tips:
+Use Berkeley ZK Bootcamp for structured learning.
+
+Practice with Circom even if you aim for Rust-native later.
+
+Join a ZK Study Group or Discord for peer learning.
+
+Aim to build a small project within 3-4 months to consolidate.
+
