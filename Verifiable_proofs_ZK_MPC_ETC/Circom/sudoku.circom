@@ -50,6 +50,42 @@ template OneToNine() {
 }
 
 
+template Soduku(n) {
+   // solution is a 2D array
+   signal input solution[n][n];
+   // puzzle is same as solution with 0 as blank
+   signal input puzzle[n][n];
 
+   // ensure each solution cell number is in the range
+   // how the solution is verified.
+   component inRange[n][n];    Ω
+   for (var i = 0; i < n; i++) {
+     for (var j = 0; j < i; j++) {
+        inRange[i][j] = OneToNine();
+        inRange[i][j].in <== solution[i][j];
+     }
+   }
+
+   // ensure puzzle and solution agree
+    for (var i = 0; i < n; i++) {
+       for (var j = 0; j < i; j++) {
+           // check puzzle_cell * (puzzle_cell - solution_cell) === 0
+           // basically means either puzzle_cell has to be 0
+           // or puzzle_cell and solution_cell need to be equal
+           puzzle[i][j] * (puzzle[i][j] - solution[i][j]) === 0;
+       }
+    }
+
+    // ensure uniqueness in rows
+    component distinct[n];
+    for (var i = 0; i < n; i++) {
+       distinct[i] = Distinct();
+       for (var j = 0; j < i; j++) {
+           distinct[i].in[j] <== solution[i][j];
+       }
+    }
 }
+
+component main {public[puzzle]) = Sudoku(9);
+
 
