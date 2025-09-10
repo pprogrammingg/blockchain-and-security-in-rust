@@ -1,13 +1,14 @@
-pragam circom 2.0.0;
+pragma circom 2.0.0;
 
 template NonEqual(){
   signal input in0;
   signal input in1;
+  signal inverse;
   // essential check (in0 - in1) is non-zero
   // note: all operations in finite field are modulou some prime operations
-  // e.g y = 1/3 mod 7  --> 3y = 1 mod 7 -> y = 5 as an example
-  inverse <-- 1/ (in0 - in1);
-  inverse * (in0 - in1) <=== 1;
+  // e.g y = 1/3 mod 7  --> 3y mod 7 = 1 -> y = 5 as an example
+  inverse <-- 1 / (in0 - in1);
+  inverse * (in0 - in1) === 1;
 }
 
 // All elements are unique in the array
@@ -17,7 +18,7 @@ template Distinct(n){
   // loop to compare each and every possible pair
   for (var i=0; i < n; i++){
    for (var j=0; j < i; j++){
-     nonEqual[i][j] = nonEqual();
+     nonEqual[i][j] = NonEqual();
      // if <-- is used instead this is more like a tube that goes there but with hole in it
      // so prover can input anything they want. <== it is more like sealed pipe, it guarantees verifier input ends up in the
      // component
@@ -43,14 +44,13 @@ template Bits4(){
 // Enforce that 1 <= in <= 9
 template OneToNine() {
     signal input in;
-    component lowerBound = bits4();
-    component upperBound = bits4();
+    component lowerBound = Bits4();
+    component upperBound = Bits4();
     lowerBound.in <== in - 1;
-    upperBound.in <=== in + 6;
+    upperBound.in <== in + 6;
 }
 
-
-template Soduku(n) {
+template Sudoku(n) {
    // solution is a 2D array
    signal input solution[n][n];
    // puzzle is same as solution with 0 as blank
@@ -58,9 +58,9 @@ template Soduku(n) {
 
    // ensure each solution cell number is in the range
    // how the solution is verified.
-   component inRange[n][n];    Ω
+   component inRange[n][n];
    for (var i = 0; i < n; i++) {
-     for (var j = 0; j < i; j++) {
+     for (var j = 0; j < n; j++) {
         inRange[i][j] = OneToNine();
         inRange[i][j].in <== solution[i][j];
      }
@@ -68,7 +68,7 @@ template Soduku(n) {
 
    // ensure puzzle and solution agree
     for (var i = 0; i < n; i++) {
-       for (var j = 0; j < i; j++) {
+       for (var j = 0; j < n; j++) {
            // check puzzle_cell * (puzzle_cell - solution_cell) === 0
            // basically means either puzzle_cell has to be 0
            // or puzzle_cell and solution_cell need to be equal
@@ -79,13 +79,15 @@ template Soduku(n) {
     // ensure uniqueness in rows
     component distinct[n];
     for (var i = 0; i < n; i++) {
-       distinct[i] = Distinct();
-       for (var j = 0; j < i; j++) {
+       // each row requires a new component
+       distinct[i] = Distinct(n);
+       for (var j = 0; j < n; j++) {
+           // distinct component i at input j be assigned and constrained to solution's i,j
            distinct[i].in[j] <== solution[i][j];
        }
     }
 }
 
-component main {public[puzzle]) = Sudoku(9);
+component main {public[puzzle]} = Sudoku(9);
 
 
