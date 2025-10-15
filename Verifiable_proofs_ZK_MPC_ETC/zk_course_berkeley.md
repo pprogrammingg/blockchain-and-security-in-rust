@@ -124,6 +124,35 @@ Lecture 3 Aug 13
 - Polynomial representation of circuit using DAG for example
 - R1CS (Rank-1 Constraint Systems)   A x z (. -> element-wise multiplication) B x z = C x z, where x means inner product
 
+- Circom -> Hardware Description Languages for R1CS - pros : gives control, but can be good or bad (most control, harder
+  to work with)
+- ArkWorks -> Rust highlevel language for R1CS (somewhere in between)
+    - Bellman (Rust), Snarky (OCaml), PLONKISH (Rust), GadgetLib (C++)
+- Zokrates -> better expressivity for R1CS (most elegant, cons: limited witness computation)
+    - Noir, Leo, Cairo similar
+
+- At the end of the day, all this languages provide these targets:
+    - R1CS, Plonk, Air
+    - They all use common techniques to represent: booleans, vars, structures, fix-width ints, mutation, control flow,
+      etc.
+
+- ZK Systems are going from idea to R1CS
+
+Lecture 4
+
+- SNARK Def -> Succinct Non-Interactive Argument of Knowledge, e.g. want to know m such that SHA256(m) = 0
+- SNARK means proof is short and it is fast to verify
+- IoP vs SNARK
+    - Soundness (there is a witness that satisfies the claim) vs Knowledge Soundness (the Prover KNOWS the witness that
+      satisfies the claim) (knowledge soundness is stronger and usually what we want - but not all the times both are
+      meaningful)
+    - IoP hard to do in certain apps like blockchain -> Fiat-Shamir turns IoP to non-interactive
+- Merkle Tree -> examine relation to IoP and SNARK
+  - 
+- SZDL - Lamma (uni and multi variate polynomials) - multivariate prefered because uses many vars but keeps the degree
+  low
+-
+
 ## Terms
 
 ## 🧠 Key Terms with Descriptions and Examples
