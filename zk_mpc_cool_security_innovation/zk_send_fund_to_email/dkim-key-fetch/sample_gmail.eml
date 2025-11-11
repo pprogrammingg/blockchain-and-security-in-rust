@@ -1,0 +1,119 @@
+Delivered-To: pnajafi@gmail.com
+Received: by 2002:a05:7300:fd12:b0:29c:f000:6fc1 with SMTP id jx18csp3158945dyc;
+        Wed, 5 Nov 2025 09:35:02 -0800 (PST)
+X-Google-Smtp-Source: AGHT+IHZFe7u8cucKjuiH2hVIulLOi4vgbt4VuxxpSl3YbvJSHaH//Kh9Qvrfk1nesOL3+uIjWCv
+X-Received: by 2002:a05:6214:1311:b0:880:4695:4626 with SMTP id 6a1803df08f44-8807115632dmr57957166d6.15.1762364102625;
+        Wed, 05 Nov 2025 09:35:02 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1762364102; cv=none;
+        d=google.com; s=arc-20240605;
+        b=RZCs44WqtNO3xzzsD8er50XElhlDYSRMQLPJOJ7Xc2dhteOwvQYKNEdO8hS1roPdzX
+         2rAOArifTNZZc8yZcEv8GLqMAQEoo6UU/AZ2NkxPX+PYqbCJtJQd0MQPcDQMfaU6h23C
+         bkV3v0vVVNNk/2l7EYlsjYSb0MSOdnMzmW1evGndqboO/kfekHztRnpVLjW+L8WeteRI
+         sf9lAp3YbMWPvWGa4WgBZvKkmKdtcrgulASzQAzLzg8qJoCXikXcwb26/3FBH92zYn22
+         5aXXcIpSPlCqjv7DZ23zoTI7MLt8E0618IBZ5m37SW5qk5hX7LCY0KXtwaxvWyy/9aQ+
+         xQmQ==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=feedback-id:date:message-id:mime-version:subject:to:from
+         :dkim-signature:dkim-signature;
+        bh=RKKw7BHtZ7hQwIIRSn4dv/xHDRCHxS9Z+2+dna73hN0=;
+        fh=NsJLgJI41zk+PX/7qeF19Bi4Cb8GR19x/+pOIuI5qX8=;
+        b=H3O54/QGyCMgw0dfekop+MSQmrdYWrDy/Byuskl9RuNgAvUEinI+XIaNXC91A+ncXt
+         tb0KtUp99j0ar65DSQvIbg8xZTf+W/9WYaXFr3F4nUclNYb+cFHns3kVzL3dMNfuNC/B
+         bsn6Z4LZl1O6goVd01kpwxC18ITbi/T/C7+xN20Aslrq9tO85cN+ezrOD5tfHWkmLZgZ
+         VmExInSGEQgFIaSrI81zIm9MA9dbb+nyIM190JHr4bILPCbO5ndko/Uep7YaSTavPD9k
+         ekXR/nK3UWLIeSlNWsA5j+l7DXy7uSocMQwqLTgqBzHltIOeerIlKVNp3hLL4+CXft3j
+         eGyg==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@ashbyhq.com header.s=o52kitveeafei4picxt43fxtgwymyfqu header.b=J1Z07Va+;
+       dkim=pass header.i=@amazonses.com header.s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw header.b=Fr7c629A;
+       spf=pass (google.com: domain of 0100019a55161611-541dd985-ab79-46b7-aa58-2a074345b148-000000@in-app-mail.ashbyhq.com designates 54.240.78.44 as permitted sender) smtp.mailfrom=0100019a55161611-541dd985-ab79-46b7-aa58-2a074345b148-000000@in-app-mail.ashbyhq.com;
+       dmarc=pass (p=QUARANTINE sp=QUARANTINE dis=NONE) header.from=ashbyhq.com
+Return-Path: <0100019a55161611-541dd985-ab79-46b7-aa58-2a074345b148-000000@in-app-mail.ashbyhq.com>
+Received: from a78-44.smtp-out.amazonses.com (a78-44.smtp-out.amazonses.com. [54.240.78.44])
+        by mx.google.com with ESMTPS id 6a1803df08f44-88082b9cfa2si253706d6.1525.2025.11.05.09.35.02
+        for <pnajafi@gmail.com>
+        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
+        Wed, 05 Nov 2025 09:35:02 -0800 (PST)
+Received-SPF: pass (google.com: domain of 0100019a55161611-541dd985-ab79-46b7-aa58-2a074345b148-000000@in-app-mail.ashbyhq.com designates 54.240.78.44 as permitted sender) client-ip=54.240.78.44;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@ashbyhq.com header.s=o52kitveeafei4picxt43fxtgwymyfqu header.b=J1Z07Va+;
+       dkim=pass header.i=@amazonses.com header.s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw header.b=Fr7c629A;
+       spf=pass (google.com: domain of 0100019a55161611-541dd985-ab79-46b7-aa58-2a074345b148-000000@in-app-mail.ashbyhq.com designates 54.240.78.44 as permitted sender) smtp.mailfrom=0100019a55161611-541dd985-ab79-46b7-aa58-2a074345b148-000000@in-app-mail.ashbyhq.com;
+       dmarc=pass (p=QUARANTINE sp=QUARANTINE dis=NONE) header.from=ashbyhq.com
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple;
+	s=o52kitveeafei4picxt43fxtgwymyfqu; d=ashbyhq.com; t=1762364102;
+	h=From:To:Subject:MIME-Version:Content-Type:Message-ID:Date;
+	bh=RKKw7BHtZ7hQwIIRSn4dv/xHDRCHxS9Z+2+dna73hN0=;
+	b=J1Z07Va+Y0r7dCxCddICWY0HmVFRWVYhN5YL7XuUr8l5lEHY5QHxFOGWc6ZiGjLs
+	ACGZvidjFCsc949hc5Mfk6qYDHIQdT3duwpP2KEv0kSBNfbp5Xwq/J9Srr6REl3qOqs
+	kd/Jkvl+KJYHccZkSlD1l+gtA7gi75Cz1MxgSutFwLm8kohKpd0LyGeiET9pYAjwW/w
+	GR26WlHGri4cSAX2WcQClnTSWCuxrRdk551aX+FwyyjvTTXTYcddMP7wzex0ufTsu6p
+	Y7haTHve5GVedeQ05balRi0NQu83rZv/BdgTQgdizwtCEddn+j7C0FAbSssav5DE/Mp
+	GX+FIb8Kew==
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple;
+	s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw; d=amazonses.com; t=1762364102;
+	h=From:To:Subject:MIME-Version:Content-Type:Message-ID:Date:Feedback-ID;
+	bh=RKKw7BHtZ7hQwIIRSn4dv/xHDRCHxS9Z+2+dna73hN0=;
+	b=Fr7c629ATfYaZZO2QAdPXo9slZdO340AYaaJmIPBfZyEUTtqXDq46JnTKNvMZbAr
+	ah3a3U+DKOwSd4gikqenBw82CJByEMq5ZFsH8i1dWHfQ56fzjt9OWniU61phBNH9Mtv
+	V5+k/N5cRS7RVXaFSuAOVXhHaMh53SK5kxswfWKw=
+From: Augment Careers <no-reply@ashbyhq.com>
+To: pnajafi@gmail.com
+Subject: Follow-Up on Your Application at Augment
+MIME-Version: 1.0
+Content-Type: multipart/alternative; 
+	boundary="----=_Part_531319_548365506.1762364102161"
+Message-ID: <0100019a55161611-541dd985-ab79-46b7-aa58-2a074345b148-000000@email.amazonses.com>
+Date: Wed, 5 Nov 2025 17:35:02 +0000
+Feedback-ID: ::1.us-east-1.WOmir7uCwltm0aTT8gfbA5rz60mv7TkX4bFsmUZNNF0=:AmazonSES
+X-SES-Outgoing: 2025.11.05-54.240.78.44
+
+------=_Part_531319_548365506.1762364102161
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+Hi Pooyan,
+
+We wanted to take a moment to thank you for your time and effort throughout=
+ our process, especially for completing the Woven assessment. We truly appr=
+eciate the energy and thought you put into it.
+
+After careful consideration, we=E2=80=99ve decided to move forward with oth=
+er candidates at this time. This wasn=E2=80=99t an easy decision, as we rec=
+ognize the skills and experience you bring to the table. While this opportu=
+nity didn=E2=80=99t work out, we=E2=80=99re grateful to have had the chance=
+ to connect and learn more about you.
+
+We sincerely wish you the best in your search and hope our paths cross agai=
+n in the future. If there=E2=80=99s anything we can do to support you along=
+ the way, please don=E2=80=99t hesitate to reach out.
+
+Best,
+Recruiting at Augment
+------=_Part_531319_548365506.1762364102161
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+<html><head><meta http-equiv=3D"Content-Type" content=3D"text/html; charset=
+=3Dutf-8"></head><body><div style=3D"min-height:1.2em;margin-top:0;margin-b=
+ottom:0">Hi <span>Pooyan</span>,</div><div style=3D"min-height:1.2em;margin=
+-top:0;margin-bottom:0">&nbsp;</div><div style=3D"min-height:1.2em;margin-t=
+op:0;margin-bottom:0">We wanted to take a moment to thank you for your time=
+ and effort throughout our process, especially for completing the Woven ass=
+essment. We truly appreciate the energy and thought you put into it.</div><=
+div style=3D"min-height:1.2em;margin-top:0;margin-bottom:0">&nbsp;</div><di=
+v style=3D"min-height:1.2em;margin-top:0;margin-bottom:0">After careful con=
+sideration, we=E2=80=99ve decided to move forward with other candidates at =
+this time. This wasn=E2=80=99t an easy decision, as we recognize the skills=
+ and experience you bring to the table. While this opportunity didn=E2=80=
+=99t work out, we=E2=80=99re grateful to have had the chance to connect and=
+ learn more about you.</div><div style=3D"min-height:1.2em;margin-top:0;mar=
+gin-bottom:0">&nbsp;</div><div style=3D"min-height:1.2em;margin-top:0;margi=
+n-bottom:0">We sincerely wish you the best in your search and hope our path=
+s cross again in the future. If there=E2=80=99s anything we can do to suppo=
+rt you along the way, please don=E2=80=99t hesitate to reach out.</div><div=
+ style=3D"min-height:1.2em;margin-top:0;margin-bottom:0">&nbsp;</div><div s=
+tyle=3D"min-height:1.2em;margin-top:0;margin-bottom:0">Best,<br />Recruitin=
+g at Augment</div></body></html>
+------=_Part_531319_548365506.1762364102161--

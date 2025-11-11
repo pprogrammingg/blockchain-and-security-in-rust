@@ -1,0 +1,10 @@
+[package]
+name = "dkim-key-fetch"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "rt"] }
+mailparse = "0.16"
+trust-dns-resolver = "0.23"
+thiserror = "2.0"

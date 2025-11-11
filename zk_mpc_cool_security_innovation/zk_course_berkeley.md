@@ -147,11 +147,20 @@ Lecture 4
       satisfies the claim) (knowledge soundness is stronger and usually what we want - but not all the times both are
       meaningful)
     - IoP hard to do in certain apps like blockchain -> Fiat-Shamir turns IoP to non-interactive
-- Merkle Tree -> examine relation to IoP and SNARK
-  - 
+
+- Polynomial Commitment :
+    - Prover commits to a polynomial and sends commitment to verifier
+    - Verifier asks for evaluation of that polynomial at a point and prover opens the commitment and evaluates and send
+      evaluation point and proof
+    - Verifier uses elliptic curve pairing equation to make valuation was correct
+
+- Merkle Tree
+    - go from pair of leaf nodes make hash, go up branches and combine pair of hash to make hash, eventually get to a
+      root hash
+    - prover gives enough info (send sibling of a leaf, other hashes) so verifier can check root hash
+
 - SZDL - Lamma (uni and multi variate polynomials) - multivariate prefered because uses many vars but keeps the degree
   low
--
 
 ## Terms
 
