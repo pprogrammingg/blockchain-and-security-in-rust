@@ -1,10 +1,14 @@
 [package]
-name = "dkim-key-fetch"
+name = "dkim_verifier"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "rt"] }
 mailparse = "0.16"
-trust-dns-resolver = "0.23"
+sha2 = "0.10"
+base64 = "0.22"
+rsa = "0.9"
 thiserror = "2.0"
+trust-dns-resolver = "0.23"
+regex = "1.11"

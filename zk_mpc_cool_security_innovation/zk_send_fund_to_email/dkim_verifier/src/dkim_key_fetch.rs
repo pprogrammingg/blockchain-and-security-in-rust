@@ -1,6 +1,4 @@
-mod error;
-
-use crate::error::{DkimError, ToDkimKeyFetchErr};
+use crate::errors::{DkimError, ToDkimError};
 use std::{env, fs};
 use trust_dns_resolver::TokioAsyncResolver;
 
