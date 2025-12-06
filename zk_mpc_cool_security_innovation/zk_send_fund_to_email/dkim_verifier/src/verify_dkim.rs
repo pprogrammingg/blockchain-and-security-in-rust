@@ -2,8 +2,11 @@
 //! Includes unit tests that generate signed emails and verify them.
 
 use base64::{Engine as _, engine::general_purpose};
-use rsa::pkcs1::{FromRsaPrivateKey, FromRsaPublicKey};
-use rsa::{PaddingScheme, RsaPrivateKey, RsaPublicKey};
+use mailparse::parse_mail;
+use pkcs1::DecodeRsaPublicKey;
+use rsa::RsaPrivateKey;
+use rsa::pkcs8::DecodePublicKey;
+use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -34,8 +37,8 @@ pub enum DkimError {
 /// Structure for parsed DKIM-Signature header fields we need
 #[derive(Debug, Clone)]
 struct DkimSignatureFields {
-    v: Option<String>,
-    a: Option<String>,
+    v: Option<String>,  // algorithm
+    a: Option<String>,  // version
     c: Option<String>,  // canonicalization (header/body)
     d: Option<String>,  // domain
     s: Option<String>,  // selector
@@ -50,131 +53,85 @@ impl DkimSignatureFields {
     }
 }
 
-/// Parse raw email into (headers_vec, body)
-fn split_headers_body(raw: &str) -> (Vec<(String, String)>, String) {
-    // split at first blank line (RFC822)
-    let mut headers = Vec::new();
-    let mut lines = raw.replace("\r\n", "\n").lines();
-    let mut in_headers = true;
-    let mut last_name: Option<String> = None;
-    let mut last_value: Option<String> = None;
-    let mut body_lines: Vec<String> = Vec::new();
-
-    while let Some(line) = lines.next() {
-        if in_headers {
-            if line.trim().is_empty() {
-                // finish last header
-                if let (Some(n), Some(v)) = (last_name.take(), last_value.take()) {
-                    headers.push((n, v));
-                }
-                in_headers = false;
-                // remaining lines are body (including this blank line omitted)
-                for l in lines {
-                    body_lines.push(l.to_string());
-                }
-                break;
-            }
-
-            // header continuation lines start with WSP
-            if line.starts_with(' ') || line.starts_with('\t') {
-                if let Some(v) = last_value.as_mut() {
-                    v.push_str("\r\n");
-                    v.push_str(line.trim_start());
-                } else {
-                    // malformed; skip
-                }
-            } else {
-                // new header
-                if let (Some(n), Some(v)) = (last_name.take(), last_value.take()) {
-                    headers.push((n, v));
-                }
-                // split at first ':'
-                if let Some(idx) = line.find(':') {
-                    let name = line[..idx].to_string();
-                    let value = line[idx + 1..].trim_start().to_string();
-                    last_name = Some(name);
-                    last_value = Some(value);
-                } else {
-                    // malformed
-                }
+/// Parse DKIM-Signature header
+fn parse_dkim_signature_header(value: &str) -> Result<DkimSignatureFields, DkimError> {
+    let mut fields = DkimSignatureFields {
+        v: None,
+        a: None,
+        c: None,
+        d: None,
+        s: None,
+        h: None,
+        bh: None,
+        b: None,
+    };
+    let mut v = value.trim();
+    if v.to_lowercase().starts_with("dkim-signature:") {
+        v = &v["dkim-signature:".len()..];
+    }
+    for part in v.split(';') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        if let Some(eq) = part.find('=') {
+            let (k, val) = (&part[..eq], &part[eq + 1..]);
+            match k {
+                "v" => fields.v = Some(val.to_string()),
+                "a" => fields.a = Some(val.to_string()),
+                "c" => fields.c = Some(val.to_string()),
+                "d" => fields.d = Some(val.to_string()),
+                "s" => fields.s = Some(val.to_string()),
+                "h" => fields.h = Some(val.to_string()),
+                "bh" => fields.bh = Some(val.to_string()),
+                "b" => fields.b = Some(val.to_string()),
+                _ => {}
             }
         }
     }
-
-    if in_headers {
-        // reached EOF while still in headers: finish last header (no body)
-        if let (Some(n), Some(v)) = (last_name.take(), last_value.take()) {
-            headers.push((n, v));
-        }
-    }
-
-    let body = body_lines.join("\r\n");
-    (headers, body)
+    Ok(fields)
 }
 
-/// Relaxed header canonicalization (RFC6376 simplified):
-/// - Convert header field name to lower-case
-/// - Unfold header value (remove CRLF WSP)
-/// - Compress WSP to single SP
-/// - Remove WSP around ":" (we use the canonical form "name:single-space value")
+/// DKIM canonicalization (header relaxed)
 fn canonicalize_header_relaxed(name: &str, value: &str) -> String {
     let name_l = name.to_lowercase();
-    // unfold and compress WSP
-    let mut v = value.replace("\r\n", "");
-    // replace multiple WSP with single space
     let mut out = String::new();
     let mut prev_wsp = false;
-    for ch in v.chars() {
+    for ch in value.replace("\r\n", "").chars() {
         if ch == ' ' || ch == '\t' {
             if !prev_wsp {
                 out.push(' ');
                 prev_wsp = true;
-            } else {
-                // skip extra
             }
         } else {
             out.push(ch);
             prev_wsp = false;
         }
     }
-    let val_trimmed = out.trim();
-    format!("{}:{}", name_l, format!(" {}", val_trimmed))
+    format!("{}: {}", name_l, out.trim())
 }
 
-/// Simple body canonicalization (RFC6376):
-/// - no changes except ensure lines end with CRLF
-/// - remove trailing empty lines (delete CRLF series at end)
+/// Body canonicalization simple
 fn canonicalize_body_simple(body: &str) -> String {
-    // ensure CRLF line endings
-    let mut s = body.replace("\r\n", "\n").replace("\r", "\n");
-    // split lines, then rejoin with CRLF
-    let mut lines: Vec<&str> = s.split('\n').collect();
-    // Remove trailing empty lines
-    while let Some(last) = lines.last() {
-        if last.is_empty() {
-            lines.pop();
-        } else {
-            break;
-        }
+    let mut lines: Vec<&str> = body
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+        .split('\n')
+        .collect();
+    while matches!(lines.last(), Some(l) if l.is_empty()) {
+        lines.pop();
     }
-    // After removing trailing empty lines, rejoin and add final CRLF
     if lines.is_empty() {
         "".to_string()
     } else {
-        let joined = lines.join("\r\n");
-        joined + "\r\n"
+        lines.join("\r\n") + "\r\n"
     }
 }
 
-/// Relaxed body canonicalization:
-/// - ignore WSP at end of lines
-/// - compress WSP within lines to single SP
-/// - remove trailing empty lines
+/// Body canonicalization relaxed
 fn canonicalize_body_relaxed(body: &str) -> String {
-    let s = body.replace("\r\n", "\n").replace("\r", "\n");
     let mut lines: Vec<String> = Vec::new();
-    for line in s.split('\n') {
-        // trim WSP at end and compress internal WSP
+    for line in body.replace("\r\n", "\n").replace("\r", "\n").split('\n') {
         let mut out = String::new();
         let mut prev_wsp = false;
         for ch in line.chars() {
@@ -188,225 +145,115 @@ fn canonicalize_body_relaxed(body: &str) -> String {
                 prev_wsp = false;
             }
         }
-        let trimmed = out.trim_end();
-        lines.push(trimmed.to_string());
+        lines.push(out.trim_end().to_string());
     }
-    // remove trailing empty lines
-    while let Some(last) = lines.last() {
-        if last.is_empty() {
-            lines.pop();
-        } else {
-            break;
-        }
+    while matches!(lines.last(), Some(l) if l.is_empty()) {
+        lines.pop();
     }
     if lines.is_empty() {
         "".to_string()
     } else {
-        let joined = lines.join("\r\n");
-        joined + "\r\n"
+        lines.join("\r\n") + "\r\n"
     }
 }
 
-/// Compute body hash (bh) base64 for given canonicalization algorithm
+/// Compute body hash
 fn compute_body_hash_b64(body: &str, body_can: &str) -> String {
     let canonical = match body_can {
         "simple" => canonicalize_body_simple(body),
         "relaxed" => canonicalize_body_relaxed(body),
         _ => canonicalize_body_simple(body),
     };
-    let mut hasher = Sha256::new();
-    hasher.update(canonical.as_bytes());
-    let digest = hasher.finalize();
+    let digest = Sha256::digest(canonical.as_bytes());
     general_purpose::STANDARD.encode(digest)
 }
 
-/// Parse DKIM-Signature header into fields map (very small parser)
-fn parse_dkim_signature_header(value: &str) -> Result<DkimSignatureFields, DkimError> {
-    // DKIM-Signature: tag1=val1; tag2=val2; ...
-    // value might include folding; assume input already unfolded
-    let mut fields = DkimSignatureFields {
-        v: None,
-        a: None,
-        c: None,
-        d: None,
-        s: None,
-        h: None,
-        bh: None,
-        b: None,
-    };
-
-    // Remove leading "DKIM-Signature:" if present
-    let mut v = value.trim();
-    if v.to_lowercase().starts_with("dkim-signature:") {
-        v = v["dkim-signature:".len()..].trim();
-    }
-
-    // split by ';' but allow values to contain '='
-    for part in v.split(';') {
-        let part = part.trim();
-        if part.is_empty() {
-            continue;
-        }
-        if let Some(eq) = part.find('=') {
-            let k = part[..eq].trim();
-            let val = part[eq + 1..].trim();
-            match k {
-                "v" => fields.v = Some(val.to_string()),
-                "a" => fields.a = Some(val.to_string()),
-                "c" => fields.c = Some(val.to_string()),
-                "d" => fields.d = Some(val.to_string()),
-                "s" => fields.s = Some(val.to_string()),
-                "h" => fields.h = Some(val.to_string()),
-                "bh" => fields.bh = Some(val.to_string()),
-                "b" => fields.b = Some(val.to_string()),
-                _ => {
-                    // ignore unknown tag
-                }
-            }
-        } else {
-            // skip
-        }
-    }
-    Ok(fields)
-}
-
-/// Extract DKIM-Signature header raw value and index from headers vec (first occurrence)
-fn find_dkim_header(headers: &[(String, String)]) -> Option<(usize, String)> {
-    for (i, (name, value)) in headers.iter().enumerate() {
-        if name.eq_ignore_ascii_case("DKIM-Signature") {
-            return Some((i, value.clone()));
-        }
-    }
-    None
-}
-
-/// Build the header canonicalization string over headers listed in `h` tag.
-/// For DKIM, the signed header block is the concatenation of the canonicalized header fields (in order)
-/// For the DKIM-Signature header itself, the 'b' tag must be excluded (i.e., set empty) when signing/verification.
+/// Build signed headers string
 fn build_signed_headers_string(
     headers: &[(String, String)],
-    dkim_index: usize,
+    _dkim_index: usize,
     h_list: &str,
     header_can: &str,
 ) -> String {
-    // h_list: header names separated by ':'
-    // The order in h_list is the order the signer used. For each header name, the last instance (closest to body) is used.
-    let want: Vec<&str> = h_list
-        .split(':')
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .collect();
-    // For quick find, we need to find last occurrence for each header name.
-    // headers are in order as they appear (top to bottom). DKIM requires the last matching header to be used.
+    let want: Vec<&str> = h_list.split(':').map(|s| s.trim()).collect();
     let mut out = String::new();
-    for name in want.iter() {
-        let mut found: Option<(String, String)> = None;
-        for (hname, hvalue) in headers.iter() {
-            if hname.eq_ignore_ascii_case(name) {
-                found = Some((hname.clone(), hvalue.clone()));
-            }
-        }
-        // Special handling: if the header we need is "dkim-signature", use the DKIM header at dkim_index but with b= removed (empty)
-        if let Some((hname, hvalue)) = found {
-            if hname.eq_ignore_ascii_case("DKIM-Signature") {
-                // remove b=... value (everything after 'b=' up to end or semicolon?). For signing, the header's "b=" value is set to empty string.
-                // We'll reconstruct by parsing tags and setting b=
-                let mut v = hvalue.clone();
-                // Replace b=... with b=
-                // naive approach: find "b=" and replace following chars (until ';' or end) with empty string
-                if let Some(bpos) = v.to_lowercase().find("b=") {
-                    // find semicolon after b=
-                    let rest = v[bpos..].to_string();
-                    if let Some(semi) = rest.find(';') {
-                        // keep up to b= and then add ' ' (empty) and keep remainder
-                        let before = &v[..bpos + 2]; // include 'b='
-                        let after = &v[bpos + 2 + semi..]; // after the semicolon
-                        let newv = format!("{}{}", before, after);
-                        // set v = newv
-                        v = newv;
-                    } else {
-                        // no semicolon; just truncate after b=
-                        let before = &v[..bpos + 2];
-                        v = before.to_string();
-                    }
+    for name in want {
+        if let Some((hname, hvalue)) = headers
+            .iter()
+            .rev()
+            .find(|(n, _)| n.eq_ignore_ascii_case(name))
+        {
+            let v = if hname.eq_ignore_ascii_case("DKIM-Signature") {
+                let mut s = hvalue.clone();
+                if let Some(pos) = s.to_lowercase().find("b=") {
+                    s.truncate(pos + 2);
                 }
-                // canonicalize header name/value according to header_can
-                if header_can == "relaxed" {
-                    out.push_str(&canonicalize_header_relaxed(&hname, &v));
-                } else {
-                    // simple canonicalization: name exactly, single colon, value as-is then CRLF
-                    out.push_str(&format!("{}: {}\r\n", hname, v));
-                }
+                s
             } else {
-                if header_can == "relaxed" {
-                    out.push_str(&canonicalize_header_relaxed(&hname, &hvalue));
-                } else {
-                    out.push_str(&format!("{}: {}\r\n", hname, hvalue));
-                }
-            }
-        } else {
-            // header not found; DKIM allows signing headers that are missing? For our test we assume present
+                hvalue.clone()
+            };
+            out.push_str(&match header_can {
+                "relaxed" => canonicalize_header_relaxed(hname, &v),
+                _ => format!("{}: {}\r\n", hname, v),
+            });
         }
     }
     out
 }
 
-/// Verify DKIM signature for RSA-SHA256
-///
-/// Returns Ok(()) on success, Err(DkimError) on failure.
+/// Verify DKIM signature (RSA-SHA256)
 pub fn verify_dkim_signature_rsa(raw_email: &str, pubkey_pem: &str) -> Result<(), DkimError> {
-    let (headers, body) = split_headers_body(raw_email);
+    let parsed = parse_mail(raw_email.as_bytes())
+        .map_err(|e| DkimError::Other(format!("mailparse: {:?}", e)))?;
+    let headers: Vec<(String, String)> = parsed
+        .get_headers()
+        .iter()
+        .map(|h| (h.get_key().to_string(), h.get_value().to_string()))
+        .collect();
+    let body = parsed
+        .get_body()
+        .map_err(|e| DkimError::Other(format!("body parse: {:?}", e)))?;
 
-    // find DKIM header
-    let (dkim_idx, dkim_raw) = find_dkim_header(&headers).ok_or(DkimError::NoDkimSignature)?;
-
-    // parse DKIM fields
-    let dkim_fields = parse_dkim_signature_header(&dkim_raw).map_err(|e| e)?;
+    // DKIM header
+    let (dkim_idx, dkim_raw) = headers
+        .iter()
+        .enumerate()
+        .find(|(_, (n, _))| n.eq_ignore_ascii_case("DKIM-Signature"))
+        .ok_or(DkimError::NoDkimSignature)?;
+    let dkim_fields = parse_dkim_signature_header(&dkim_raw)?;
 
     let bh = dkim_fields.bh.ok_or(DkimError::BadSignatureField)?;
     let b_sig = dkim_fields.b.ok_or(DkimError::BadSignatureField)?;
     let h_list = dkim_fields.h.ok_or(DkimError::BadSignatureField)?;
-    // canonicalization: default relaxed/simple if absent
     let c = dkim_fields
         .c
         .unwrap_or_else(|| "relaxed/simple".to_string());
     let parts: Vec<&str> = c.split('/').collect();
-    let header_can = parts.get(0).map(|s| *s).unwrap_or("relaxed");
-    let body_can = parts.get(1).map(|s| *s).unwrap_or("simple");
+    let header_can = parts.get(0).unwrap_or(&"relaxed");
+    let body_can = parts.get(1).unwrap_or(&"simple");
 
-    // 1) verify body hash (bh)
-    let computed_bh = compute_body_hash_b64(&body, body_can);
-    if computed_bh != bh {
+    // verify body hash
+    if compute_body_hash_b64(&body, body_can) != bh {
         return Err(DkimError::BodyHashMismatch);
     }
 
-    // 2) build signed header block string in canonicalized form
-    let signed_headers_str = build_signed_headers_string(&headers, dkim_idx, &h_list, header_can);
-    // The DKIM signing input is the canonicalized header block (bytes)
-    // compute SHA256 then verify signature using RSA PKCS1v15 with sha256
-    // decode signature b (base64)
+    let signed_headers_str = build_signed_headers_string(&headers, *dkim_idx, &h_list, header_can);
+
     let sig_bytes = general_purpose::STANDARD
         .decode(&b_sig)
         .map_err(|e| DkimError::Other(format!("base64 decode sig: {}", e)))?;
 
-    // parse pubkey pem to RsaPublicKey
-    // accept PKCS1 or PKCS8? Here we try PKCS1 (BEGIN RSA PUBLIC KEY) or SubjectPublicKeyInfo (BEGIN PUBLIC KEY)
     let pubkey = RsaPublicKey::from_pkcs1_pem(pubkey_pem)
         .or_else(|_| RsaPublicKey::from_public_key_pem(pubkey_pem))
         .map_err(|e| DkimError::PublicKeyParse(format!("{:?}", e)))?;
 
-    // verify signature
-    let mut hasher = Sha256::new();
-    hasher.update(signed_headers_str.as_bytes());
-    let digest = hasher.finalize();
-
+    let digest = Sha256::digest(signed_headers_str.as_bytes());
     let padding = PaddingScheme::PKCS1v15Sign {
         hash: Some(rsa::hash::Hash::SHA2_256),
     };
-    match pubkey.verify(padding, &digest, &sig_bytes) {
-        Ok(_) => Ok(()),
-        Err(_) => Err(DkimError::SignatureVerifyFailed),
-    }
+    pubkey
+        .verify(padding, &digest, &sig_bytes)
+        .map_err(|_| DkimError::SignatureVerifyFailed)
 }
 
 /// Helper test-only routine: create DKIM signature value for given headers/body using RSA private key.
