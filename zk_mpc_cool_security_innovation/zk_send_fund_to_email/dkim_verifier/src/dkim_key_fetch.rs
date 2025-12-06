@@ -2,24 +2,11 @@ use crate::errors::{DkimError, ToDkimError};
 use std::{env, fs};
 use trust_dns_resolver::TokioAsyncResolver;
 
-#[tokio::main]
-async fn main() -> Result<(), DkimError> {
-    // Accept file path or read stdin if - passed
-    let arg = env::args().nth(1).unwrap_or_else(|| "-".to_string());
-    let raw = if arg == "-" {
-        // read from stdin
-        let mut s = String::new();
-        std::io::read_to_string(std::io::stdin()).to_dkim_key_fetch_err()?;
-        s
-    } else {
-        fs::read_to_string(&arg).to_dkim_key_fetch_err()?
-    };
-    println!("{}", arg);
-
+async fn dkim_key_fetch(raw: String) -> Result<String, DkimError> {
     // Parse message headers
-    let parsed = mailparse::parse_mail(&raw.as_bytes()).to_dkim_key_fetch_err()?;
+    let parsed_mail = mailparse::parse_mail(&raw.as_bytes()).to_dkim_key_fetch_err()?;
     // mailparse returns headers in parsed.get_headers()
-    let headers = parsed.get_headers();
+    let headers = parsed_mail.get_headers();
 
     // Find DKIM-Signature header (there can be multiple; we'll handle first)
     let dkim_header = headers
@@ -30,8 +17,10 @@ async fn main() -> Result<(), DkimError> {
     let dkim_raw = match dkim_header {
         Some(v) => v,
         None => {
-            println!("No DKIM-Signature header found in message.");
-            return Ok(());
+            println!();
+            return Err(DkimError::DkimKeyFetch(
+                "No DKIM-Signature header found in message.".to_owned(),
+            ));
         }
     };
 
@@ -43,15 +32,17 @@ async fn main() -> Result<(), DkimError> {
     let domain = match params.get("d") {
         Some(d) => d,
         None => {
-            println!("DKIM header missing 'd=' domain parameter.");
-            return Ok(());
+            return Err(DkimError::DkimKeyFetch(
+                "DKIM header missing 'd=' domain parameter.".to_owned(),
+            ));
         }
     };
     let selector = match params.get("s") {
         Some(s) => s,
         None => {
-            println!("DKIM header missing 's=' selector parameter.");
-            return Ok(());
+            return Err(DkimError::DkimKeyFetch(
+                "DKIM header missing 's=' selector parameter.".to_owned(),
+            ));
         }
     };
 
@@ -73,6 +64,7 @@ async fn main() -> Result<(), DkimError> {
 
     // TXT records may be split across multiple strings; join each txt data into one long string.
     let mut found = false;
+    let mut pub_key = "".to_string();
     for txt in txt_response.iter() {
         let joined = txt
             .txt_data()
@@ -84,19 +76,23 @@ async fn main() -> Result<(), DkimError> {
 
         // Parse params of the TXT (format like: "v=DKIM1; k=rsa; p=MIIBI...;")
         let txt_params = parse_tag_value_pairs(&joined);
-        if let Some(p) = txt_params.get("p") {
-            println!("Found public key (p=):\n{}\n", p);
-            found = true;
+
+        if let Some(found_pub_key) = txt_params.get("p") {
+            println!("Found public key (p=):\n{}\n", found_pub_key);
+            pub_key = found_pub_key.to_string();
         } else {
             println!("TXT record didn't contain p= parameter.\n");
         }
     }
 
     if !found {
-        println!("No 'p=' public key found in TXT records for {}.", dns_name);
+        return Err(DkimError::DkimKeyFetch(format!(
+            "No 'p=' public key found in TXT records for {}.",
+            dns_name
+        )));
     }
 
-    Ok(())
+    Ok(pub_key)
 }
 
 // Parse a DKIM header value into a map of params.

@@ -4,11 +4,19 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "rt"] }
-mailparse = "0.16"
-sha2 = "0.10"
 base64 = "0.22"
+hex = "0.4"
+regex = "1.11"
+log = "0.4.27"
+mailparse = "0.16"
+rand = "0.9"
 rsa = "0.9"
+sha2 = "0.10"
 thiserror = "2.0"
 trust-dns-resolver = "0.23"
-regex = "1.11"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "rt"] }
+tracing-subscriber = "0.3.19"
+tracing = "0.1.41"
+
+[dev-dependencies]
+pem = "3.0"
