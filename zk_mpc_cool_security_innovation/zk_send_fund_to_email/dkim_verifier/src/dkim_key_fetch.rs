@@ -1,5 +1,4 @@
 use crate::errors::{DkimError, ToDkimError};
-use std::{env, fs};
 use trust_dns_resolver::TokioAsyncResolver;
 
 async fn dkim_key_fetch(raw: String) -> Result<String, DkimError> {
@@ -63,7 +62,7 @@ async fn dkim_key_fetch(raw: String) -> Result<String, DkimError> {
         .to_dkim_key_fetch_err()?;
 
     // TXT records may be split across multiple strings; join each txt data into one long string.
-    let mut found = false;
+    let found = false;
     let mut pub_key = "".to_string();
     for txt in txt_response.iter() {
         let joined = txt
