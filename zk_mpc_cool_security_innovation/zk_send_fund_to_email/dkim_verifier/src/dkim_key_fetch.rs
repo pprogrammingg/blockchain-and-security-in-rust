@@ -3,7 +3,7 @@ use trust_dns_resolver::TokioAsyncResolver;
 
 async fn dkim_key_fetch(raw: String) -> Result<String, DkimError> {
     // Parse message headers
-    let parsed_mail = mailparse::parse_mail(&raw.as_bytes()).to_dkim_key_fetch_err()?;
+    let parsed_mail = mailparse::parse_mail(raw.as_bytes()).to_dkim_key_fetch_err()?;
     // mailparse returns headers in parsed.get_headers()
     let headers = parsed_mail.get_headers();
 

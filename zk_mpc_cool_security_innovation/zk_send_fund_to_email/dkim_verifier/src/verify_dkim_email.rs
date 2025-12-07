@@ -1,8 +1,8 @@
 use base64::{Engine as _, engine::general_purpose};
-use mailparse::parse_mail;
+use mailparse::{MailHeaderMap, parse_mail};
 use regex::Regex;
 use rsa::pkcs1v15::{Signature, SigningKey, VerifyingKey};
-use rsa::signature::{DigestSigner, DigestVerifier, SignatureEncoding, Signer, Verifier};
+use rsa::signature::{SignatureEncoding, Signer, Verifier};
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -31,17 +31,21 @@ fn canonicalize_headers(
     canon_type: &str,
 ) -> Result<String, String> {
     let parsed = parse_mail(raw_email.as_bytes()).map_err(|e| e.to_string())?;
+    let headers = parsed.get_headers();
+
     let mut result = String::new();
 
-    for header_name in header_list {
-        if let Some(h) = parsed
-            .get_headers()
-            .iter()
-            .find(|hdr| hdr.get_key().eq_ignore_ascii_case(header_name))
-        {
+    // Compile regex once if relaxed canonicalization is used
+    let whitespace_re = if canon_type == "relaxed" {
+        Some(Regex::new(r"\s+").unwrap())
+    } else {
+        None
+    };
+
+    for &header_name in header_list {
+        if let Some(h) = headers.get_first_header(header_name) {
             let mut val = h.get_value();
-            if canon_type == "relaxed" {
-                let re = Regex::new(r"\s+").unwrap();
+            if let Some(re) = &whitespace_re {
                 val = re.replace_all(val.trim(), " ").to_string();
             }
             result.push_str(&format!("{}:{}", header_name.to_lowercase(), val));
