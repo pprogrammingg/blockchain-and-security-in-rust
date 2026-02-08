@@ -1,69 +1,60 @@
 use crate::errors::{DkimError, ToDkimError};
+use crate::utils::collapse_whitespace;
+use mailparse::parse_mail;
+use std::collections::HashMap;
 use trust_dns_resolver::TokioAsyncResolver;
 
-async fn dkim_key_fetch(raw: String) -> Result<String, DkimError> {
-    // Parse message headers
-    let parsed_mail = mailparse::parse_mail(raw.as_bytes()).to_dkim_key_fetch_err()?;
-    // mailparse returns headers in parsed.get_headers()
-    let headers = parsed_mail.get_headers();
+/// Fetches the DKIM public key (p=) from DNS based on the DKIM-Signature
+/// in the given raw email.
+///
+/// This is required to verify DKIM signatures. Our login/ZK flow relies on
+/// retrieving the public key for signature verification.
+///
+/// Steps:
+/// 1. Parse the raw email headers using `mailparse`.
+/// 2. Locate the first `DKIM-Signature` header.
+/// 3. Parse DKIM parameters (d=domain, s=selector) from the header.
+/// 4. Build the DNS TXT query: `<selector>._domainkey.<domain>`.
+/// 5. Lookup TXT records using async DNS resolver.
+/// 6. Parse TXT data to find the `p=` public key.
+///
+/// Notes:
+/// - Only the first DKIM-Signature header is used (multi-signature emails ignored).
+/// - Folding, extra whitespace, and line breaks are normalized.
+/// - Returns an error if `DKIM-Signature`, `d=`, `s=`, or `p=` is missing.
+pub async fn dkim_key_fetch(raw_email: String) -> Result<String, DkimError> {
+    // Parse email headers
+    let parsed = parse_mail(raw_email.as_bytes()).to_dkim_key_fetch_err()?;
+    let headers = parsed.get_headers();
 
-    // Find DKIM-Signature header (there can be multiple; we'll handle first)
+    // Find DKIM-Signature header
     let dkim_header = headers
         .into_iter()
         .find(|h| h.get_key().eq_ignore_ascii_case("DKIM-Signature"))
-        .map(|h| h.get_value());
+        .map(|h| h.get_value())
+        .ok_or_else(|| {
+            DkimError::DkimKeyFetch("No DKIM-Signature header found in message.".into())
+        })?;
 
-    let dkim_raw = match dkim_header {
-        Some(v) => v,
-        None => {
-            println!();
-            return Err(DkimError::DkimKeyFetch(
-                "No DKIM-Signature header found in message.".to_owned(),
-            ));
-        }
-    };
+    // Parse DKIM parameters
+    let params = parse_dkim_header_params(&dkim_header);
+    let domain = params.get("d").ok_or_else(|| {
+        DkimError::DkimKeyFetch("DKIM header missing 'd=' domain parameter.".into())
+    })?;
+    let selector = params.get("s").ok_or_else(|| {
+        DkimError::DkimKeyFetch("DKIM header missing 's=' selector parameter.".into())
+    })?;
 
-    println!("Found DKIM-Signature header:\n{}\n", dkim_raw);
-
-    // Parse DKIM params: "k=v; k2=v2; ..." -- header may contain folded whitespace
-    let params = parse_dkim_header_params(&dkim_raw);
-    // Need domain (d=) and selector (s=)
-    let domain = match params.get("d") {
-        Some(d) => d,
-        None => {
-            return Err(DkimError::DkimKeyFetch(
-                "DKIM header missing 'd=' domain parameter.".to_owned(),
-            ));
-        }
-    };
-    let selector = match params.get("s") {
-        Some(s) => s,
-        None => {
-            return Err(DkimError::DkimKeyFetch(
-                "DKIM header missing 's=' selector parameter.".to_owned(),
-            ));
-        }
-    };
-
-    println!("DKIM domain (d): {}", domain);
-    println!("DKIM selector (s): {}", selector);
-
-    // Build DNS query name: "<selector>._domainkey.<domain>"
     let dns_name = format!("{}._domainkey.{}", selector, domain);
-    println!("Querying TXT record for: {}\n", dns_name);
 
-    // Create resolver with system config
+    // Async DNS resolver
     let resolver = TokioAsyncResolver::tokio_from_system_conf().to_dkim_key_fetch_err()?;
-
-    // Do TXT lookup
     let txt_response = resolver
         .txt_lookup(dns_name.clone())
         .await
         .to_dkim_key_fetch_err()?;
 
-    // TXT records may be split across multiple strings; join each txt data into one long string.
-    let found = false;
-    let mut pub_key = "".to_string();
+    // Extract p= from TXT records
     for txt in txt_response.iter() {
         let joined = txt
             .txt_data()
@@ -71,53 +62,41 @@ async fn dkim_key_fetch(raw: String) -> Result<String, DkimError> {
             .map(|b| String::from_utf8_lossy(b).into_owned())
             .collect::<Vec<_>>()
             .join("");
-        println!("DNS Raw TXT record: {}\n", joined);
 
-        // Parse params of the TXT (format like: "v=DKIM1; k=rsa; p=MIIBI...;")
         let txt_params = parse_tag_value_pairs(&joined);
-
-        if let Some(found_pub_key) = txt_params.get("p") {
-            println!("Found public key (p=):\n{}\n", found_pub_key);
-            pub_key = found_pub_key.to_string();
-        } else {
-            println!("TXT record didn't contain p= parameter.\n");
+        if let Some(pub_key) = txt_params.get("p") {
+            return Ok(pub_key.to_string());
         }
     }
 
-    if !found {
-        return Err(DkimError::DkimKeyFetch(format!(
-            "No 'p=' public key found in TXT records for {}.",
-            dns_name
-        )));
-    }
-
-    Ok(pub_key)
+    Err(DkimError::DkimKeyFetch(format!(
+        "No 'p=' public key found in TXT records for {}.",
+        dns_name
+    )))
 }
 
-// Parse a DKIM header value into a map of params.
-// Example header body: "v=1; a=rsa-sha256; d=example.com; s=brisbane; ..."
-// This is tolerant to whitespace and folded lines.
-fn parse_dkim_header_params(header: &str) -> std::collections::HashMap<String, String> {
-    // DKIM headers sometimes include the "DKIM-Signature: " prefix if raw; ensure we only parse value.
-    // We simply split on ';' and then split first '='.
+/// Parses a DKIM-Signature header into key-value parameters.
+///
+/// Example: `"v=1; a=rsa-sha256; d=example.com; s=brisbane;"`
+/// becomes `{"v":"1", "a":"rsa-sha256", "d":"example.com", "s":"brisbane"}`
+pub fn parse_dkim_header_params(header: &str) -> HashMap<String, String> {
     parse_tag_value_pairs(header)
 }
 
-fn parse_tag_value_pairs(s: &str) -> std::collections::HashMap<String, String> {
-    let mut map = std::collections::HashMap::new();
-    // Remove line breaks and normalize spaces
-    let norm = s.replace("\r\n", " ").replace('\n', " ");
-    // Split by ';'
+/// Generic parser for `key=value` pairs separated by `;`, tolerant to
+/// whitespace and line breaks. Normalizes whitespace using `collapse_whitespace`.
+pub fn parse_tag_value_pairs(s: &str) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    let norm = collapse_whitespace(&s.replace("\r\n", " ").replace('\n', " "));
+
     for part in norm.split(';') {
         let p = part.trim();
-        if p.is_empty() {
-            continue;
-        }
         if let Some(eq_pos) = p.find('=') {
             let key = p[..eq_pos].trim().to_lowercase();
             let val = p[eq_pos + 1..].trim().to_string();
             map.insert(key, val);
         }
     }
+
     map
 }
